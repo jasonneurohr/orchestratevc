@@ -1,22 +1,23 @@
 # orchestratevc
 
-Example Acano/CMS Usage:
--------------
-Setting properties for all callLegProfiles:
+# Example Acano/CMS Usage:
 
-.. code-block:: python
+**Setting properties for all callLegProfiles:**
+
+```python
     cms = orchestratevc.CiscoMS(api_host="x.x.x.x", api_port="445", api_pass="password")
     cms.set_all_calllegprofile_properties(
         {
             "muteOthersAllowed": "true",
             "changeJoinAudioMuteOverrideAllowed": "true"
         })
+```
 
-Example Supervisor Usage
--------------
-Export Supervisor Configuration:
+# Example Supervisor Usage
 
-.. code-block:: python
+**Export Supervisor Configuration:**
+
+```python
     supervisor = CiscoMSESupervisor(api_host="x.x.x.x", api_port="445", api_pass="password")
     conf = supervisor.export_config()
 
@@ -27,13 +28,13 @@ Export Supervisor Configuration:
     for line in conf:
         fh.write(line.strip('\r'))
     fh.close()
+```
 
+# Example TPS Usage
 
-Example TPS Usage
--------------
-Export TPS Configuration:
+**Export TPS Configuration:**
 
-.. code-block:: python
+```python
     tps = CiscoTPS(api_host='x.x.x.x', api_pass='password')
     conf = tps.export_config()
 
@@ -43,30 +44,33 @@ Export TPS Configuration:
     fh = open(filename, 'w')
     for line in conf:
         fh.write(line.strip('\r'))
+```
 
-Retrieving TPS CDRs:
+**Retrieving TPS CDRs:**
 
-.. code-block:: python
+```python
     tps = orchestratevc.CiscoTPS(api_host='x.x.x.x', api_pass='password')
     tps.get_cdrs()
 
     for record in tps.cdr_jar:
         print(record)
+```
 
-Enumerating CDRs
+**Enumerating CDRs**
 
-..code-block:: python
+```python
     tps = orchestratevc.CiscoTPS(api_host='x.x.x.x', api_pass='password')
     tps.get_cdrs()
 
     for cdr in tps.cdr_jar:
         print(cdr)
+```
 
-Example VCS/Expressway Usage
--------------
-Export VCS/Expressway Configuration:
+# Example VCS/Expressway Usage
 
-.. code-block:: python
+**Export VCS/Expressway Configuration:**
+
+```python
     vcs = CiscoExp(api_host='x.x.x.x', api_pass='password')
     conf = vcs.export_xconf()
 
@@ -76,12 +80,13 @@ Export VCS/Expressway Configuration:
     fh = open(filename, 'w')
     fh.write(conf)
     fh.close()
+```
 
-Example ISDN Usage
--------------
-Export ISDN GW Configuration:
+# Example ISDN Usage
 
-.. code-block:: python
+**Export ISDN GW Configuration:**
+
+```python
     isdngw1 = CiscoISDN(api_host='x.x.x.x', api_pass='password')
     conf = isdngw1.export_config()
 
@@ -92,3 +97,4 @@ Export ISDN GW Configuration:
     for line in conf:
         fh.write(line.strip('\r'))
     fh.close()
+```
