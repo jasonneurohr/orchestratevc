@@ -46,16 +46,6 @@
         fh.write(line.strip('\r'))
 ```
 
-**Retrieving TPS CDRs:**
-
-```python
-    tps = orchestratevc.CiscoTPS(api_host='x.x.x.x', api_pass='password')
-    tps.get_cdrs()
-
-    for record in tps.cdr_jar:
-        print(record)
-```
-
 **Enumerating CDRs**
 
 ```python
