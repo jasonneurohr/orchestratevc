@@ -15,6 +15,12 @@ class CiscoMS(object):
         self.api_user = str(api_user)
         self.api_pass = str(api_pass)
 
+        # Resultant URLs
+        self.url_api = "https://{api_host}:{api_port}/api/v1/calls".format(
+            api_host=self.api_host,
+            api_port=self.api_port
+        )
+
     def get_spaces(self):
         url_secure_api = "https://" + str(self.api_host) + ":" + str(self.api_port) + "/api/v1/cospaces"
         api_session = requests.session()
@@ -101,6 +107,19 @@ class CiscoMS(object):
             return calllegprofile_id
         except:
             return
+
+    def get_total_conferences(self):
+        api_session = requests.session()
+        api_session.auth = self.api_user, self.api_pass
+        api_response_conferences = api_session.get(self.url_api, verify=False, timeout=10)
+        xml_api_response = xmltodict.parse(api_response_conferences.text)
+
+        try:
+            total_conferences = xml_api_response['calls']['@total']
+        except:
+            return 0
+
+        return int(total_conferences)
 
     def set_all_calllegprofile_properties(self, properties={}):
         url_secure_api = "https://" + str(self.api_host) + ":" + str(self.api_port) + "/api/v1/calllegprofiles"
@@ -223,14 +242,19 @@ class CiscoMS(object):
 
 
 class CiscoMSESupervisor(object):
-    def __init__(self, api_host="127.0.0.1", api_user="admin", api_pass="password"):
+    def __init__(self, api_host="127.0.0.1", api_user="admin", api_pass="password", secure_conn=True):
         self.api_host = str(api_host)
         self.api_user = str(api_user)
         self.api_pass = str(api_pass)
+        self.secure_conn = secure_conn
 
         # Resultant URLs
         self.url_auth_secure = "https://" + str(self.api_host) + "/login_change.html"
         self.url_auth = "http://" + str(self.api_host) + "/login_change.html"
+        if self.secure_conn is True:
+            self.url_api = "https://" + str(self.api_host) + "/RPC2"
+        elif self.secure_conn is False:
+            self.url_api = "http://" + str(self.api_host) + "/RPC2"
 
     def export_config(self):
         """
@@ -247,6 +271,54 @@ class CiscoMSESupervisor(object):
             host_response = host_session.post(self.url_auth, data=post_data, verify=False, timeout=10)
 
         return host_response.text
+
+    def get_blade_status(self):  # Todo
+        post_req = "<methodCall><methodName>chassis.blades.query</methodName><params><param><value><struct><member>" \
+                   "<name>authenticationPassword</name><value><string>{api_pass}</string></value></member><member>" \
+                   "<name>authenticationUser</name><value><string>{api_user}</string></value></member></struct></value><" \
+                   "/param></params></methodCall>".format(
+            api_pass=self.api_pass,
+            api_user=self.api_user
+        )
+
+        session = requests.session()
+        host_response = session.post(self.url_api, data=post_req, verify=False, timeout=10)
+
+        xml_to_dict = xmltodict.parse(host_response.text)
+        base_xml_path = xml_to_dict["methodResponse"]["params"]["param"]["value"]["struct"]["member"]["value"] \
+            ["array"]["data"]["value"]
+
+        blades = []
+
+        for blade in base_xml_path:
+            blade_properties = OrderedDict()
+            for blade_keys in blade["struct"]["member"]:
+                if blade_keys['name'] == 'slot':
+                    blade_properties['slot'] = blade_keys["value"]["int"]
+                if blade_keys['name'] == 'type':
+                    blade_properties['blade_type'] = blade_keys["value"]["string"]
+                if blade_keys['name'] == 'status':
+                    blade_properties['blade_status'] = blade_keys["value"]["string"]
+                if blade_keys['name'] == 'softwareVersion':
+                    blade_properties['blade_version'] = blade_keys["value"]["string"]
+                if blade_keys['name'] == 'portA':
+                    blade_properties['blade_ip'] = blade_keys["value"]["string"]
+
+            blades.append(blade_properties)
+
+        return blades
+
+    def get_fantry_status(self):  # Todo
+        # chassis.fantrays.query
+        return
+
+    def get_chassis_health(self):  # Todo
+        # device.health.query
+        return
+
+    def get_chassis_info(self):  # Todo
+        # device.query
+        return
 
 
 class CiscoTPS(object):
