@@ -1,0 +1,15 @@
+version: '2'
+
+services:
+    db:
+        build: ./db/
+        image: orchestratevc-db
+        ports:
+            - "27017:27017"
+    api:
+        build: ./api/
+        image: orchestratevc-api
+        ports:
+            - "5000:5000"
+        volumes:
+            - ../../:/orchestratevc

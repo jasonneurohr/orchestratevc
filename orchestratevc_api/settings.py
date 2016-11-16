@@ -1,8 +1,8 @@
 
 schema_cdr_cisco_tps = {
     '_id':{},
-    'time_stamp': {'type': 'datetime',},
-    'device_serial': {'type': 'string',},
+    'time_stamp': {},
+    'device_serial': {},
     'index': {},
     'event_type': {},
     'participant_guid': {},
@@ -28,11 +28,11 @@ schema_cdr_cisco_tps = {
 
 schema_cdr_cisco_tps_concurrent = {
     '_id':{},
-    'time_stamp': {'type': 'datetime',},
-    'device_serial': {'type': 'string',},
-    'event_type': {},
-    'conference_guid': {},
-    'duration': {},
+    'time_stamp': {'type': 'datetime'},
+    'device_serial': {'type': 'string'},
+    'event_type': {'type': 'string'},
+    'conference_guid': {'type': 'string'},
+    'duration': {'type': 'integer'},
 }
 
 
@@ -41,8 +41,8 @@ DOMAIN = {
         'datasource': {
             'source': 'cdr_cisco_tps',
         },
-        'resource_methods': ['GET'],
-        'schema': schema_cdr_cisco_tps,
+        'resource_methods': ['GET', 'POST'],
+        'schema': schema_cdr_cisco_tps2,
     },
     'ciscoCdrTpsConcurrent': {
         'datasource': {
@@ -53,19 +53,17 @@ DOMAIN = {
     }
 }
 
-# Let's just use the local mongod instance. Edit as needed.
+# Update the MONGO_PASSWORD if it has been changed in the createUser.js file
 
-# Please note that MONGO_HOST and MONGO_PORT could very well be left
-# out as they already default to a bare bones local 'mongod' instance.
-MONGO_HOST = 'localhost'
+MONGO_HOST = 'db'
 MONGO_PORT = 27017
-
-# Skip these if your db has no auth. But it really should.
-#MONGO_USERNAME = '<your username>'
-#MONGO_PASSWORD = '<your password>'
-
+MONGO_AUTHDBNAME = 'admin'
+MONGO_USERNAME = 'reporting'
+MONGO_PASSWORD = 'password'
 MONGO_DBNAME = 'reporting'
 
 # Ends up being /api/v1/<xx>
 URL_PREFIX = 'api'
 API_VERSION = 'v1'
+
+SERVER_NAME = None
