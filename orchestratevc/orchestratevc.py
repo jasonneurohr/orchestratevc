@@ -3,7 +3,7 @@ import xmltodict
 from datetime import datetime, timedelta
 from paramiko import SSHClient, AutoAddPolicy
 from time import sleep
-from lxml import etree
+from lxml import etree, html
 from collections import OrderedDict
 from json import dumps, loads
 
@@ -508,12 +508,12 @@ class CiscoTPS(object):
                         "tpsClusterType": cluster_type,
                         "tpsPlatform": platform,
                         "utc_offset": utc_offset
-                        }
+        }
 
         self.serial = serial
         self.sys_name = system_name
         self.utf_offset = utc_offset
-        return (propertyDict)
+        return propertyDict
 
     def get_util(self):
         """
@@ -1129,9 +1129,120 @@ class CiscoISDN(object):
 
         # Resultant URLs
         if self.secure_conn is True:
+            self.url_api = "https://" + str(self.api_host) + "/RPC2"
             self.url_auth = "https://" + str(self.api_host) + "/login_change.html"
+            self.url_login = "https://" + str(self.api_host) + "/login.html"
+            self.url_logout = "https://" + str(self.api_host) + "/logout.html"
+            self.url_sys = "https://" + str(self.api_host) + "/system.xml"
+            self.url_conf = "https://" + str(self.api_host) + "/configuration.xml"
         elif self.secure_conn is False:
+            self.url_api = "http://" + str(self.api_host) + "/RPC2"
             self.url_auth = "http://" + str(self.api_host) + "/login_change.html"
+            self.url_login = "http://" + str(self.api_host) + "/login.html"
+            self.url_logout = "http://" + str(self.api_host) + "/logout.html"
+            self.url_sys = "http://" + str(self.api_host) + "/system.xml"
+            self.url_conf = "http://" + str(self.api_host) + "/configuration.xml"
+
+        # ISDN GW object properties
+        self.serial = None
+        self.sys_name = None
+        self.api_version = None
+        self.utf_offset = None
+
+        # Used for CDR processing
+        self.cdr_next_index = 0
+        self.cdr_start_index = 0
+        self.cdr_events_remaining = 0
+        self.cdr_last_read_index = 0
+        self.cdr_jar = []
+
+        # Call get_properties method to initialise the ISDN GW object properties
+        self.get_properties()
+
+    def get_properties(self):
+        """
+        Gets various ISDN GW properties and returns them as JSON
+        :return:
+        """
+        auth_payload = {'user_name': self.api_user, 'password': self.api_pass}
+        session = requests.session()
+
+        post_data = """\
+        <methodCall>
+            <methodName>device.query</methodName>
+                <params>
+                    <param>
+                        <value>
+                            <struct>
+                                <member>
+                                    <name>authenticationPassword</name>
+                                    <value><string>%s</string></value>
+                                </member>
+                                <member>
+                                    <name>authenticationUser</name>
+                                    <value><string>%s</string></value>
+                                </member>
+                            </struct>
+                        </value>
+                    </param>
+                </params>
+        </methodCall>
+        """ % (self.api_pass, self.api_user)
+
+        try:
+            r = session.post(self.url_api, data=post_data, verify=False, timeout=10)
+        except Exception as e:
+            return e
+
+        system_xml_to_dict = xmltodict.parse(r.text)
+        base_xml_path = system_xml_to_dict['methodResponse']['params']['param']['value']['struct']['member']
+
+        serial = base_xml_path[2]['value']['string']
+        software_version = base_xml_path[8]['value']['string']
+        model = base_xml_path[7]['value']['string']
+        api_version = base_xml_path[3]['value']['string']
+
+        try:
+            r = session.post(self.url_sys, data=post_data, verify=False, timeout=10)
+        except Exception as e:
+            return e
+        
+        system_xml_to_dict = xmltodict.parse(r.text)
+        host_name = system_xml_to_dict["system"]["hostName"]
+
+        # NEWER ISDN GW VERSION IMPLEMENTS CSRF SECURITY
+        if software_version == "2.2(1.111)P":
+            response_login = session.get(self.url_login, verify=False, timeout=10)
+            scrape_response_login = html.fromstring(response_login.text)
+            csrf_key = list(set(scrape_response_login.xpath("//input[@name='CSRFKey']/@value")))[0]
+            csrf_nonce = list(set(scrape_response_login.xpath("//input[@name='CSRFNonce']/@value")))[0]
+            auth_payload = {'CSRFKey': csrf_key, 'CSRFNonce': csrf_nonce, 'user_name': self.api_user, 'password': self.api_pass}
+        else:
+            auth_payload = {'user_name': self.api_user, 'password': self.api_pass}
+
+        try:
+            session.post(self.url_auth, data=auth_payload, verify=False, timeout=10)
+            r = session.get(self.url_conf, verify=False, timeout=10)
+            session.get(self.url_logout, verify=False, timeout=10)
+        except Exception as e:
+            return e
+        
+        conf_xml_to_dict = xmltodict.parse(r.text)
+        utc_offset = conf_xml_to_dict['configuration']['settings']['ntp']['@utc_offset']
+
+        property_dict = {"serial":serial,
+                "software_version":software_version,
+                "api_version":api_version,
+                "model":model,
+                "host_name":host_name,
+                "utc_offset": utc_offset
+        }
+
+        self.serial = serial
+        self.sys_name = host_name
+        self.api_version = api_version
+        self.utf_offset = utc_offset
+        return property_dict
 
     def export_config(self):
         """
@@ -1149,8 +1260,94 @@ class CiscoISDN(object):
 
         return host_response.text
 
+    def get_cdrs(self):
+        if self.api_version == "2.7":
+            api_version_supported = "yes"
+        elif self.api_version == "2.10":
+            api_version_supported = "yes"
+        else:
+            api_version_supported = "no"
+            return
+
+        td = timedelta(hours=int(self.utf_offset))
+
+        post_data = """\
+            <methodCall>
+                <methodName>cdrlog.enumerate</methodName>
+                <params>
+                    <param>
+                        <value>
+                            <struct>
+                                <member>
+                                    <name>authenticationPassword</name>
+                                    <value><string>%s</string></value>
+                                </member>
+                                <member>
+                                    <name>authenticationUser</name>
+                                    <value><string>%s</string></value>
+                                </member>
+                                <member>
+                                    <name>index</name>
+                                    <value><int>%s</int></value>
+                                </member>
+                            </struct>
+                        </value>
+                    </param>
+                </params>
+            </methodCall>
+            """ % (self.api_pass, self.api_user, self.cdr_last_read_index)
+
+        session = requests.session()
+
+        try:
+            r = session.post(self.url_api, post_data, verify=False, timeout=10)
+        except (requests.Timeout, requests.ConnectionError):
+            r = session.post()
+
+        xml_to_dict = xmltodict.parse(r.text)
+        base_xml_path = xml_to_dict['methodResponse']['params']\
+            ['param']['value']['struct']['member'][0]['value']['array']['data']['value']
+        
+        self.cdr_start_index = xml_to_dict['methodResponse']['params'] \
+            ['param']['value']['struct']['member'][1]['value']['int']
+        self.cdr_events_remaining = xml_to_dict['methodResponse']['params'] \
+            ['param']['value']['struct']['member'][2]['value']['boolean']
+
+        for cdr_dict in base_xml_path:
+            base_cdr_path = cdr_dict['struct']['member'][3]
+
+            try:
+                index_id = cdr_dict['struct']['member'][0]['value']['int']
+            except Exception as e:
+                # Can't get the index lets check if this record had 0 events remaining
+                # if it does we can safetly assume that this is ok. otherwise we have an error
+                if self.cdr_events_remaining == "0":
+                    # Nothing left
+                    return
+                elif self.cdr_events_remaining == "1":
+                    # Can't find event index
+                    return
+
+            # Get the CDR timestamp, deduct the TZ, reformat
+            timestamp = cdr_dict['struct']['member'][1]['value']['dateTime.iso8601']
+            timestamp = datetime.strptime(timestamp, "%Y%m%dT%H:%M:%S") - td
+            timestamp = datetime.strptime(str(timestamp), "%Y-%m-%d %H:%M:%S").strftime('%Y-%m-%dT%H:%M:%S')
+            event_type = cdr_dict['struct']['member'][2]['value']['string']
+
+            # Create a unique key for the record
+            record_key_timestamp = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S").strftime('%Y%m%d%H%M%S')
+            record_key = self.serial + "_" + str(index_id) + "_" + str(record_key_timestamp)
+
+            # CDR type newConnection
+            try:
+                if event_type == "newConnection":
+                    pass
+            except Exception as e:
+                return e
 
 class CiscoExp(object):
+
+
     def __init__(self, api_host="127.0.0.1", api_user="admin", api_pass="password"):
         self.api_host = str(api_host)
         self.api_user = str(api_user)
@@ -1271,3 +1468,5 @@ class CiscoExp(object):
                                   "_" + str(datetime.utcnow().strftime('%Y%m%d%H%M%S'))
 
         return dumps(data_dict)
+
+

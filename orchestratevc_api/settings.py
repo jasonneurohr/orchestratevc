@@ -42,7 +42,7 @@ DOMAIN = {
             'source': 'cdr_cisco_tps',
         },
         'resource_methods': ['GET', 'POST'],
-        'schema': schema_cdr_cisco_tps2,
+        'schema': schema_cdr_cisco_tps,
     },
     'ciscoCdrTpsConcurrent': {
         'datasource': {
@@ -57,7 +57,6 @@ DOMAIN = {
 
 MONGO_HOST = 'db'
 MONGO_PORT = 27017
-MONGO_AUTHDBNAME = 'admin'
 MONGO_USERNAME = 'reporting'
 MONGO_PASSWORD = 'password'
 MONGO_DBNAME = 'reporting'
