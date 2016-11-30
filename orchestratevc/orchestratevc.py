@@ -1314,10 +1314,10 @@ class CiscoISDN(object):
             ['param']['value']['struct']['member'][2]['value']['boolean']
 
         for cdr_dict in base_xml_path:
-            base_cdr_path = cdr_dict['struct']['member'][3]
+            base_cdr_path = cdr_dict['struct']['member']
 
             try:
-                index_id = cdr_dict['struct']['member'][0]['value']['int']
+                index_id = base_cdr_path[0]['value']['int']
             except Exception as e:
                 # Can't get the index lets check if this record had 0 events remaining
                 # if it does we can safetly assume that this is ok. otherwise we have an error
@@ -1329,10 +1329,11 @@ class CiscoISDN(object):
                     return
 
             # Get the CDR timestamp, deduct the TZ, reformat
-            timestamp = cdr_dict['struct']['member'][1]['value']['dateTime.iso8601']
+            timestamp = base_cdr_path[1]['value']['dateTime.iso8601']
             timestamp = datetime.strptime(timestamp, "%Y%m%dT%H:%M:%S") - td
             timestamp = datetime.strptime(str(timestamp), "%Y-%m-%d %H:%M:%S").strftime('%Y-%m-%dT%H:%M:%S')
-            event_type = cdr_dict['struct']['member'][2]['value']['string']
+            event_type = base_cdr_path[2]['value']['string']
+            unique_id = base_cdr_path[3]['value']['struct']['member']['value']['int']
 
             # Create a unique key for the record
             record_key_timestamp = datetime.strptime(timestamp, "%Y-%m-%dT%H:%M:%S").strftime('%Y%m%d%H%M%S')
@@ -1341,13 +1342,92 @@ class CiscoISDN(object):
             # CDR type newConnection
             try:
                 if event_type == "newConnection":
-                    pass
+                    direction = base_cdr_path[4]['value']['struct']['member'][0]['value']['string']
+                    calling_number = base_cdr_path[4]['value']['struct']['member'][1]['value']['string']
+                    original_called_number = base_cdr_path[4]['value']['struct']['member'][2]['value']['string']
+                    call_type = base_cdr_path[5]['value']['struct']['member'][0]['value']['string']
+                    max_call_duration = base_cdr_path[5]['value']['struct']['member'][1]['value']['string']
+
+                    data_dict = OrderedDict()
+                    data_dict['time_stamp'] = timestamp
+                    data_dict['device_serial'] = self.serial
+                    data_dict['device_name'] = self.sys_name
+                    data_dict['index'] = index_id
+                    data_dict['event_type'] = event_type
+                    data_dict['unique_id'] = unique_id
+                    data_dict['direction'] = direction
+                    data_dict['calling_number'] = calling_number
+                    data_dict['original_called_number'] = original_called_number
+                    data_dict['call_type'] = call_type
+                    data_dict['max_call_duration'] = max_call_duration
+
+            except Exception as e:
+                return e
+            # END CDR TYPE
+
+            # FOR CDR TYPE connectionProceeding
+            try:
+                if event_type == "connectionProceeding":
+                    via_auto_attendant = base_cdr_path[4]['value']['struct']['member'][0]['value']['string']
+                    final_called_number = base_cdr_path[4]['value']['struct']['member'][1]['value']['string']
+                    if base_cdr_path[5]['value']['struct'] == None:
+                        pass #write cdr
+                    elif type(base_cdr_path[5]['value']['struct']['member']) == list:
+                        x = 0
+                        sub_call_dict = {}
+                        for sub_call in base_cdr_path[5]['value']['struct']['member']:
+                            sub_call_number = base_cdr_path[5]['value']['struct']['member'][x]['value']['string']
+                            sub_call_string = "sub_call_" + str(x)
+                            sub_call_json = """"%s": "%s"}""" % (sub_call_string,sub_call_number)
+                            sub_call_dict[x] = sub_call_json
+                            x += 1
+                        # CONSTRUCT THE SUB CALL JSON STRING
+                        x = 0
+                        sub_call_string = ""
+                        for sub_call,sub_call_number in sub_call_dict.items():
+                            if x > 0:
+                                sub_call_string = sub_call_string + "," + " {" + sub_call_number + ""
+                            else:
+                                sub_call_string = sub_call_string = " {" + sub_call_number
+                            x += 1
+                    elif type(base_cdr_path[5]['value']['struct']['member']) == dict:
+                        sub_call_0 = str(base_cdr_path[5]['value']['struct']['member']["value"]["string"])
+                        sub_call_string = """{"sub_call_0": "%s"}""" % (sub_call_0)
             except Exception as e:
                 return e
 
+            # END CDR TYPE connectionProceeding
+
+            # FOR CDR TYPE connectionFinished
+            try:
+                if event_type == "connectionFinished":
+                    duration = base_cdr_path[4]['value']['struct']['member'][0]['value']['int']
+                    duration_in_minutes = base_cdr_path[4]['value']['struct']['member'][1]['value']['int']
+                    disconnect_reason = base_cdr_path[4]['value']['struct']['member'][2]['value']['string']
+                    calling_number = base_cdr_path[4]['value']['struct']['member'][3]['value']['string']
+                    original_called_number = base_cdr_path[4]['value']['struct']['member'][4]['value']['string']
+                    final_called_number = base_cdr_path[4]['value']['struct']['member'][5]['value']['string']
+                    direction = base_cdr_path[4]['value']['struct']['member'][6]['value']['string']
+                    try:
+                        protocol = base_cdr_path[4]['value']['struct']['member'][7]['value']['string']
+                    except:
+                        protocol = ""
+                    number_of_b_channels = base_cdr_path[5]['value']['struct']['member'][0]['value']['int']
+                    restricted = base_cdr_path[5]['value']['struct']['member'][1]['value']['string']
+                    isdn_bandwidth = base_cdr_path[5]['value']['struct']['member'][2]['value']['int']
+                    downspeeded = base_cdr_path[5]['value']['struct']['member'][3]['value']['string']
+                    ep_ip_address = base_cdr_path[6]['value']['struct']['member'][0]['value']['string']
+                    ep_dn = base_cdr_path[6]['value']['struct']['member'][1]['value']['string']
+                    ep_h323_alias = base_cdr_path[6]['value']['struct']['member'][2]['value']['string']
+                    from_isdn_video_codec = base_cdr_path[7]['value']['struct']['member'][0]['value']['string']
+                    from_isdn_audio_codec = base_cdr_path[7]['value']['struct']['member'][1]['value']['string']
+                    to_isdn_video_codec = base_cdr_path[8]['value']['struct']['member'][0]['value']['string']
+                    to_isdn_audio_codec = base_cdr_path[8]['value']['struct']['member'][1]['value']['string']
+            except Exception as e:
+                return e
+            # END CDR TYPE connectionFinished
+
 class CiscoExp(object):
-
-
     def __init__(self, api_host="127.0.0.1", api_user="admin", api_pass="password"):
         self.api_host = str(api_host)
         self.api_user = str(api_user)
@@ -1470,3 +1550,41 @@ class CiscoExp(object):
         return dumps(data_dict)
 
 
+class TcCeEndpoint(object):
+    def __init__(self, api_host="127.0.0.1", api_user="admin", api_pass="password", secure_conn=True):
+        self.api_host = str(api_host)
+        self.api_user = str(api_user)
+        self.api_pass = str(api_pass)
+        self.secure_conn = secure_conn
+
+        # Resultant URLs
+        if self.secure_conn is True:
+            self.url_status = "https://" + str(self.api_host) + "/status.xml"
+            self.url_config = "https://" + str(self.api_host) + "/configuration.xml"
+        elif self.secure_conn is False:
+            self.url_status = "http://" + str(self.api_host) + "/status.xml"
+            self.url_config = "http://" + str(self.api_host) + "/configuration.xml"
+
+    def get_config(self):
+        session = requests.session()
+
+        try:
+            r = session.get(self.url_config, verify=False, timeout=10)
+        except Exception as e:
+            return e
+        
+        # Convert config XML to dict and return
+        config_dict = xmltodict.parse(r.text)
+        # Add a time_stamp to the dict to note when it was collected
+        config_dict['time_stamp'] = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S')
+
+        return config_dict
+
+    def commit(self, api_url='http://localhost:5000/ciscoTcConfig', config_dict):
+        config_dict = dumps(config_dict)
+        session = requests.session()
+        
+        try:
+            r = session.post(api_url, config_dict, verify=False, timeout=10)
+        except Exception as e:
+            return e

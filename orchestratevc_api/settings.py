@@ -35,6 +35,18 @@ schema_cdr_cisco_tps_concurrent = {
     'duration': {'type': 'integer'},
 }
 
+schema_util_cisco_expressway_license = {
+    '_id':{},
+    'time_stamp': {},
+    'device_serial': {},
+    "device_name": {},
+    "traversal_in_use": {},
+    "traversal_limit": {},
+    "non_traversal_in_use": {},
+    "non_traversal_limit": {},
+    "current_registrations": {},
+    "concurrent_calls": {},
+}
 
 DOMAIN = {
     'ciscoCdrTps': {
@@ -50,7 +62,25 @@ DOMAIN = {
         },
         'resource_methods': ['GET'],
         'schema': schema_cdr_cisco_tps_concurrent,
-    }
+    },
+    'ciscoTcConfig': {
+        'allow_unknown': True,
+        'pagination': False, # testing
+        'hateoas': False, # testing
+        'datasource': {
+            'source': 'config_tc',
+        },
+        'resource_methods': ['GET', 'POST', 'DELETE'],
+    },
+    'ciscoExpLicUtil': {
+        'allow_unknown': True,
+        'pagination': False, # testing
+        'hateoas': False, # testing
+        'datasource': {
+            'source': 'util_cisco_expressway_license',
+        },
+        'resource_methods': ['GET', 'POST', 'DELETE'],
+    },
 }
 
 # Update the MONGO_PASSWORD if it has been changed in the createUser.js file
@@ -66,3 +96,6 @@ URL_PREFIX = 'api'
 API_VERSION = 'v1'
 
 SERVER_NAME = None
+
+# For CORS
+X_DOMAINS = '*'
