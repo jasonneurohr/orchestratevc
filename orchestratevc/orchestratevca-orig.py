@@ -1580,7 +1580,7 @@ class TcCeEndpoint(object):
 
         return config_dict
 
-    def commit(self, api_url='http://localhost:5000/ciscoTcConfig', config_dict):
+    def commit(self, config_dict, api_url='http://localhost:5000/ciscoTcConfig'):
         config_dict = dumps(config_dict)
         session = requests.session()
         
