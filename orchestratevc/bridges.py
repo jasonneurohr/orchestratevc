@@ -46,13 +46,30 @@ class Bridges:
 
 
 class Cms(Bridges):
-    """Cisco CMS subclass
+    """Cisco Meeting Server (CMS) subclass
+
+    Methods:
+        ~ accessMethods:
+            del_am(self, space_id, am_id)
+            set_am(self, space_id, am_id=None, properties={})
+            get_am(self, space_id, am_id)
+        ~ callLegProfiles:
+        ~ callProfiles:
+        ~ calls:
+            conf_count(self)
+        ~ coSpaces:
+        ~ misc:
+            valid_certificate(self)
+
     """
 
     def __init__(self, api_host, api_user, api_pass, api_port='443'):
         """Initialise a Cms object
         Call the superclass's __init__ method and pass the required
         arguments.
+
+        self.__ssl_is_valid will call the valid_certificate(self) method,
+        to determine whether the CMS certificate is valid.
 
         Args:
             __api_host (str): IP address or resolvable name of the device.
@@ -70,8 +87,26 @@ class Cms(Bridges):
         )
 
         self.__url_api_clps = self.__url_api + 'calllegprofiles' # callLegProfiles
+        self.__url_api_cps = self.__url_api + 'callprofiles' # callProfiles
         self.__url_api_calls = self.__url_api + 'calls'
         self.__url_api_cospaces = self.__url_api + 'cospaces'
+        self.__ssl_is_valid = self.valid_certificate()
+
+    def valid_certificate(self):
+        """Check certificate validity
+
+        Returns:
+            bool: True if certificate is valid. Otherwise False
+        """
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        try:
+            resp = s.get(self.__url_api_calls, timeout=10)
+        except requests.exceptions.SSLError as err:
+            # SSL Cert is invalid, fall back to non-verify
+            return False
+        return True
 
     def get_spaces(self):
         """Get coSpace objects
@@ -136,25 +171,31 @@ class Cms(Bridges):
             return
 
     def get_space_accessmethods(self, space_id):
-        """
+        """Get all accessMethod objects for a given cospace id
+
+        Args:
+            space_id (str): cospace id
         """
 
         accessmethod_ids = []
         req_url = self.__url_api_cospaces + '/' + space_id + "/accessmethods/"
-        api_session = requests.session()
-        api_session.auth = self.get_api_user(), self.get_api_pass()
-        api_response_accessmethods = api_session.get(req_url, verify=False, timeout=10)
-        xml_api_response = xmltodict.parse(api_response_accessmethods.text)
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        try:
+            resp = s.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+            xml_resp = xmltodict.parse(resp.text)
+        except Exception as err:
+            return err
 
-        total_accessmethods = int(xml_api_response['accessMethods']['@total'])
+        total_accessmethods = int(xml_resp['accessMethods']['@total'])
 
         if total_accessmethods == 0:  # NO ACCESS METHODS.... RETURN
             return
         if total_accessmethods == 1:
-            accessmethod_id = xml_api_response['accessMethods']['accessMethod']['@id']
+            accessmethod_id = xml_resp['accessMethods']['accessMethod']['@id']
             return accessmethod_id
         if total_accessmethods > 1:
-            for accessmethod in xml_api_response['accessMethods']['accessMethod']:
+            for accessmethod in xml_resp['accessMethods']['accessMethod']:
                 accessmethod_ids.append(accessmethod['@id'])
             return accessmethod_ids
 
@@ -172,18 +213,24 @@ class Cms(Bridges):
         except:
             return
 
-    def get_total_conferences(self):
-        """
+    def conf_count(self):
+        """Get the total number of conferences
+
+        Returns:
+            int: total conference count
         """
 
-        api_session = requests.session()
-        api_session.auth = self.get_api_user(), self.get_api_pass()
-        api_response_conferences = api_session.get(self.__url_api_calls, verify=False, timeout=10)
-        xml_api_response = xmltodict.parse(api_response_conferences.text)
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        try:
+            resp = s.get(self.__url_api_calls, verify=self.__ssl_is_valid, timeout=10)
+        except Exception as err:
+            return err
+        xml_resp = xmltodict.parse(resp.text)
 
         try:
-            total_conferences = xml_api_response['calls']['@total']
-        except:
+            total_conferences = xml_resp['calls']['@total']
+        except Exception as err:
             return 0
 
         return int(total_conferences)
@@ -221,13 +268,193 @@ class Cms(Bridges):
                 print(api_response.text)
         return
 
-class tps(Bridges):
-    """
-    """
+    def del_spaces_and_artifacts(self, filter=[]):
+        api_session = requests.session()
+        api_session.auth = self.get_api_user(), self.get_api_pass()
+        api_response = api_session.get(self.__url_api_cospaces, verify=False, timeout=10)
+        xml_api_response = xmltodict.parse(api_response.text)
+        total_spaces = int(xml_api_response['coSpaces']['@total'])
 
-    def __init__(self, api_host, api_user, api_pass, api_port='443'):
+        if total_spaces == 0:  # No spaces
+            return
+
+        if total_spaces == 1:
+            space_id = str(xml_api_response['coSpaces']['coSpace']['@id'])
+            callprofile_id = self.get_space_callprofile(space_id)
+
+            # Check if the space ID is in the filter list, if True return
+            if space_id in filter:
+                return
+
+            if callprofile_id is not None:  # Space has a profile which will be deleted
+                req_url = self.__url_api_cps + "/" + callprofile_id
+                api_session.delete(req_url, verify=False, timeout=10)
+
+            accessmethod_ids = self.get_space_accessmethods(space_id)
+
+            if type(accessmethod_ids) == str:  # Only 1 accessmethod
+                calllegprofile_id = self.get_space_calllegprofiles(space_id, accessmethod_ids)
+                if callprofile_id is not None:
+                    req_url = self.__url_api_clps + '/' + calllegprofile_id
+                    api_session.delete(req_url, verify=False, timeout=10)
+
+            if type(accessmethod_ids) == list:  # Multiple access methods
+                for accessmethod_id in accessmethod_ids:
+                    calllegprofile_id = self.get_space_calllegprofiles(space_id,accessmethod_id)
+                    if calllegprofile_id is not None:
+                        req_url = self.__url_api_clps + '/' + calllegprofile_id
+                        api_session.delete(req_url, verify=False, timeout=10)
+
+            # Finally delete the space (and subsequently the access methods)
+            req_url = self.__url_api_cospaces + '/' + space_id
+            api_session.delete(req_url, verify=False, timeout=10)
+
+        if total_spaces > 1:
+            for space in xml_api_response['coSpaces']['coSpace']:
+                space_id = str(space['@id'])
+                callprofile_id = self.get_space_callprofile(space_id)
+
+                # Check if the space ID is in the filter list, if True pass
+                if space_id in filter:
+                    pass
+                else:
+                    if callprofile_id is not None:  # Space has a profile which will be deleted
+                        req_url = self.__url_api_cps + '/' + callprofile_id
+                        api_session.delete(req_url, verify=False, timeout=10)
+
+                    accessmethod_ids = self.get_space_accessmethods(space_id)
+
+                    if type(accessmethod_ids) == str:  # Only 1 accessmethod
+                        calllegprofile_id = self.get_space_calllegprofiles(space_id, accessmethod_id)
+                        if callprofile_id is not None:
+                            req_url = self.__url_api_clps + '/' + calllegprofile_id
+                            api_session.delete(req_url, verify=False, timeout=10)
+
+                    if type(accessmethod_ids) == list:  # Multiple access methods
+                        for accessmethod_id in accessmethod_ids:
+                            calllegprofile_id = self.get_space_calllegprofiles(space_id, accessmethod_id)
+                            if calllegprofile_id is not None:
+                                req_url = self.__url_api_clps + '/' + calllegprofile_id
+                                api_session.delete(req_url, verify=False, timeout=10)
+
+                    # Finally delete the space (and subsequently the access methods)
+                    req_url = self.__url_api_cospaces + '/' + space_id
+                    api_session.delete(req_url, verify=False, timeout=10)
+
+    def set_am(self, space_id, am_id=None, properties={}):
+        """Set Access Method properties
+
+        If no accessMethod id is specified a new access method will be created.
+        If accessMethod id is specified any defined properties will be set.
+
+        Args:
+            space_id (str): cospace id
+            am_id (str): accessMethod id if existing
+            properties (dict): dictionary of accessMethod properties (if any)
+
+        Returns:
+            bool: True for success. False otherwise
         """
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+
+        if am_id is None:
+            # accessMethod doesn't already exist. POST
+            req_url = self.__url_api_cospaces + '/' + space_id + '/accessmethods/'
+            try:
+                resp = s.post(req_url, verify=self.__ssl_is_valid, data=properties, timeout=10)
+            except Exception as err:
+                return err
+            return True
+        else:
+            # Existing accessMethod. PUT
+            req_url = self.__url_api_cospaces + '/' + space_id + '/accessmethods/' + am_id
+            try:
+                resp = s.put(req_url, verify=self.__ssl_is_valid, data=properties, timeout=10)
+            except Exception as err:
+                return err
+            if resp.status_code == 400:
+                # accessMethod doesn't exist
+                return False
+            return True
+
+    def del_am(self, space_id, am_id):
+        """Delete an Access Method
+
+        Args:
+            space_id (str): cospace id
+            am_id (str): accessMethod id if existing
+
+        Returns:
+            bool: True for success. False otherwise
         """
 
-        bridges.__init__(self, api_host, api_port, api_user, api_pass)
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
 
+        req_url = self.__url_api_cospaces + '/' + space_id + '/accessmethods/' + am_id
+        try:
+            resp = s.delete(req_url, verify=self.__ssl_is_valid, timeout=10)
+        except Exception as err:
+            return err
+        if resp.status_code == 400:
+            # accessMethod doesn't exist
+            return False
+        return True
+
+    def get_am(self, space_id, am_id):
+        """Get an Access Methods Properties
+
+        Args:
+            space_id (str): cospace id
+            am_id (str): accessMethod id if existing
+        """
+
+class Tps(Bridges):
+    """Cisco TelePresence Server subclass
+
+    It is requi
+    """
+
+    def __init__(self, api_host, api_user, api_pass, insecure=False):
+        """Initialise a Tps object
+        Call the superclass's __init__ method and pass the required
+        arguments.
+        """
+
+        Bridges.__init__(self, api_host, api_user, api_pass)
+
+        # If insecure is True base URL will use HTTP
+        if insecure is True:
+            self.__url = 'http://{api_host}/'.format(api_host = self.get_api_host())
+        else:
+            self.__url = 'https://{api_host}/'.format(api_host = self.get_api_host())
+
+        self.__url_api = self.__url + '/RPC2'
+        self.__url_sys = self.__url + '/system.xml'
+        self.__url_conf = self.__url + '/configuration.xml'
+        self.__url_auth = self.__url + '/login_change.html'
+        self.__url_logout = self.__url + '/logout.html'
+
+        self.__serial = None
+        self.__sys_name = None
+        self.__utf_offset = None
+
+    def get_serial(self):
+        return
+    
+    def get_system_name(self):
+        return
+    
+    def get_utc_offset(self):
+        return
+    
+    def set_serial(self):
+        return
+    
+    def set__system_name(self):
+        return
+    
+    def set_utc_offset(self):
+        return
