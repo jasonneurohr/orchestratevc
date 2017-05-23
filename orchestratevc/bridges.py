@@ -51,13 +51,14 @@ class Cms(Bridges):
     Methods:
         ~ accessMethods:
             del_am(self, space_id, am_id)
-            set_am(self, space_id, am_id=None, properties={})
+            set_am(self, space_id, am_id=None, properties=None)
             get_am(self, space_id, am_id)
         ~ callLegProfiles:
         ~ callProfiles:
         ~ calls:
             conf_count(self)
         ~ coSpaces:
+            query_spaces(self, query, limit=None, offset=None)
         ~ misc:
             valid_certificate(self)
 
@@ -235,7 +236,7 @@ class Cms(Bridges):
 
         return int(total_conferences)
 
-    def set_all_calllegprofile_properties(self, properties={}):
+    def set_all_calllegprofile_properties(self, properties=None):
         """
         """
 
@@ -268,7 +269,7 @@ class Cms(Bridges):
                 print(api_response.text)
         return
 
-    def del_spaces_and_artifacts(self, filter=[]):
+    def del_spaces_and_artifacts(self, filter_string=None):
         api_session = requests.session()
         api_session.auth = self.get_api_user(), self.get_api_pass()
         api_response = api_session.get(self.__url_api_cospaces, verify=False, timeout=10)
@@ -315,7 +316,7 @@ class Cms(Bridges):
                 callprofile_id = self.get_space_callprofile(space_id)
 
                 # Check if the space ID is in the filter list, if True pass
-                if space_id in filter:
+                if space_id in filter_string:
                     pass
                 else:
                     if callprofile_id is not None:  # Space has a profile which will be deleted
@@ -341,7 +342,7 @@ class Cms(Bridges):
                     req_url = self.__url_api_cospaces + '/' + space_id
                     api_session.delete(req_url, verify=False, timeout=10)
 
-    def set_am(self, space_id, am_id=None, properties={}):
+    def set_am(self, space_id, am_id=None, properties=None):
         """Set Access Method properties
 
         If no accessMethod id is specified a new access method will be created.
@@ -376,6 +377,8 @@ class Cms(Bridges):
                 return err
             if resp.status_code == 400:
                 # accessMethod doesn't exist
+                # API response should be:
+                # <?xml version="1.0"?><failureDetails><accessMethodDoesNotExist /></failureDetails>
                 return False
             return True
 
@@ -400,6 +403,8 @@ class Cms(Bridges):
             return err
         if resp.status_code == 400:
             # accessMethod doesn't exist
+            # API response should be:
+            # <?xml version="1.0"?><failureDetails><accessMethodDoesNotExist /></failureDetails>
             return False
         return True
 
@@ -410,6 +415,49 @@ class Cms(Bridges):
             space_id (str): cospace id
             am_id (str): accessMethod id if existing
         """
+
+    def query_spaces(self, query, limit=None, offset=None):
+        """Query all spaces
+
+        Args:
+            query (str): the query string
+            limit (int): object return limit
+            offset (int): object offset limit
+
+        Returns:
+            dict: dictionary of 'coSpace id':'coSpace name' k:v pairs
+        """
+
+        space_dict = {}
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+
+        req_url = self.__url_api_cospaces + '?filter=' + str(query)
+
+        if limit != None:
+            req_url += '&limit=' + str(limit)
+        if offset != None:
+            req_url += '&offset=' + str(offset)
+
+        try:
+            resp = s.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+        except Exception as err:
+            return err
+
+        xml_resp = xmltodict.parse(resp.text)
+        total_spaces = int(xml_resp['coSpaces']['@total'])
+
+        if total_spaces == 0:
+            return
+        elif total_spaces == 1:
+            space_id = xml_resp['coSpaces']['coSpace']['@id']
+            space_name = xml_resp['coSpaces']['coSpace']['name']
+            space_dict[space_id] = space_name
+            return space_dict
+        elif total_spaces > 1:
+            for space in xml_resp['coSpaces']['coSpace']:
+                space_dict[space['@id']] = space['name']
+            return space_dict
 
 class Tps(Bridges):
     """Cisco TelePresence Server subclass
