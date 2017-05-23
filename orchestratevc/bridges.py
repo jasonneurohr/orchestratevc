@@ -53,10 +53,18 @@ class Cms(Bridges):
             del_am(self, space_id, am_id)
             set_am(self, space_id, am_id=None, properties=None)
             get_am(self, space_id, am_id)
+        ~ callLegs
+            get_legs(self, call_id=None)
+            get_leg(self, leg_id)
+            mod_leg(self, leg_id)
         ~ callLegProfiles:
         ~ callProfiles:
+            get_cps(self)
+            get_cp(self, cp_id)
         ~ calls:
             conf_count(self)
+            get_calls(self, limit=None, offset=None)
+            get_call(self, call_id)
         ~ coSpaces:
             query_spaces(self, query, limit=None, offset=None)
         ~ misc:
@@ -459,6 +467,70 @@ class Cms(Bridges):
                 space_dict[space['@id']] = space['name']
             return space_dict
 
+    def get_calls(self, limit=None, offset=None):
+        """Get all calls
+
+        Args:
+            query (str): the query string
+            limit (int): object return limit
+        
+        Returns:
+        """
+    
+    def get_call(self, call_id):
+        """Get specific call details
+
+        Args:
+            call_id (str): the call id
+            limit (int): object return limit
+
+        Returns:
+        """
+    
+    def get_cps(self):
+        """Get all call profiles
+
+        Args:
+
+        Returns:
+        """
+    def get_cp(self, cp_id):
+        """Get specific call profile
+
+        Args:
+            cp_id (str): call profile id
+
+        Returns:
+        """
+
+    def get_legs(self, call_id=None):
+        """Get call legs
+
+        Limit to a specific call by passing the call_id
+
+        Args:
+            call_id (str): the call id if specified
+
+        Returns:
+        """
+
+    def get_leg(self, leg_id):
+        """Get specific call leg details
+
+        Args:
+            leg_id (str): the call leg id
+
+        Returns:
+        """
+
+    def mod_leg(self, leg_id):
+        """Modify an active call leg
+
+        Args:
+            leg_id (str): the call leg id
+
+        Returns:
+        """
 class Tps(Bridges):
     """Cisco TelePresence Server subclass
 
