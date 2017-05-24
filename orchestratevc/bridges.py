@@ -69,6 +69,8 @@ class Cms(Bridges):
             query_spaces(self, query, limit=None, offset=None)
         ~ misc:
             valid_certificate(self)
+        ~ system:
+            get_licensing(self)
 
     """
 
@@ -99,6 +101,7 @@ class Cms(Bridges):
         self.__url_api_cps = self.__url_api + 'callprofiles' # callProfiles
         self.__url_api_calls = self.__url_api + 'calls'
         self.__url_api_cospaces = self.__url_api + 'cospaces'
+        self.__url_api_mlic = self.__url_api + 'system/multipartyLicensing' # multipartyLicensing
         self.__ssl_is_valid = self.valid_certificate()
 
     def valid_certificate(self):
@@ -531,6 +534,25 @@ class Cms(Bridges):
 
         Returns:
         """
+    def get_licensing(self):
+        """Get CMS multipartyLicensing details
+
+        Returns:
+            dict: dict of license properties
+        """
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+
+        try:
+            resp = s.get(self.__url_api_mlic, verify=self.__ssl_is_valid, timeout=10)
+        except Exception as err:
+            return err
+
+        xml_resp = xmltodict.parse(resp.text)['multipartyLicensing']
+
+        return xml_resp
+
 class Tps(Bridges):
     """Cisco TelePresence Server subclass
 
