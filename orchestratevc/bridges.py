@@ -1,6 +1,7 @@
 
 import requests
 import xmltodict
+import datetime
 
 
 class Bridges:
@@ -550,6 +551,9 @@ class Cms(Bridges):
             return err
 
         xml_resp = xmltodict.parse(resp.text)['multipartyLicensing']
+        # Convert time_stamp str to datetime object for correct insertion into MongoDB
+        xml_resp['timestamp'] = datetime.datetime.strptime(
+            xml_resp['timestamp'], '%Y-%m-%dT%H:%M:%SZ')
 
         return xml_resp
 
@@ -569,19 +573,60 @@ class Tps(Bridges):
 
         # If insecure is True base URL will use HTTP
         if insecure is True:
-            self.__url = 'http://{api_host}/'.format(api_host = self.get_api_host())
+            self.__url = 'http://{api_host}/'.format(api_host=self.get_api_host())
         else:
-            self.__url = 'https://{api_host}/'.format(api_host = self.get_api_host())
+            self.__url = 'https://{api_host}/'.format(api_host=self.get_api_host())
 
         self.__url_api = self.__url + '/RPC2'
         self.__url_sys = self.__url + '/system.xml'
         self.__url_conf = self.__url + '/configuration.xml'
         self.__url_auth = self.__url + '/login_change.html'
         self.__url_logout = self.__url + '/logout.html'
+        self.__ssl_is_valid = self.valid_certificate()
 
         self.__serial = None
         self.__sys_name = None
         self.__utf_offset = None
+
+    def valid_certificate(self):
+        """Check certificate validity
+
+        Returns:
+            bool: True if certificate is valid. Otherwise False
+        """
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        try:
+            resp = s.get(self.__url_sys, timeout=10)
+        except requests.exceptions.SSLError as err:
+            # SSL Cert is invalid, fall back to non-verify
+            return False
+        return True
+
+    def __tps_properties(self):
+        """Gathers various TPS data
+        """
+
+        post_sysinfo = (
+            '<methodCall><methodName>system.info</methodName>'
+            '<params><param><value><struct><member>'
+            '<name>authenticationPassword</name>'
+            '<value><string>{}</string></value>'
+            '</member><member>'
+            '<name>authenticationUser</name>'
+            '<value><string>{}</string></value>'
+            '</member></struct></value></param></params>'
+            '</methodCall>').format(self.get_api_pass(), self.get_api_user())
+
+        s = requests.session()
+        try:
+            resp = s.post(self.__url_api, verify=self.__ssl_is_valid, timeout=10)
+        except Exception as err:
+            return err
+
+        #xml_resp = xmltodict.parse(r.text)
+        #xml_path = xml_resp["methodResponse"]["params"]["param"]["value"]["struct"]["member"]
 
     def get_serial(self):
         return
