@@ -550,6 +550,9 @@ class Cms(Bridges):
         Returns:
         """
 
+        if call_id is None:
+            return False
+
         call_legs = dict()
 
         s = requests.session()
@@ -570,12 +573,12 @@ class Cms(Bridges):
                 'call': xml_resp['callLegs']['callLeg']['call']}
 
         elif int(xml_resp['callLegs']['@total']) > 1:
-            for call_leg in xml_resp['calls']['call']: #TODO
+            for call_leg in xml_resp['callLegs']['callLeg']:
                 call_leg_id = call_leg['@id']
                 call_legs[call_leg_id] = {
-                    "name": call_legs['name'],
-                    "remoteParty": call_legs['remoteParty'],
-                    "call": call_legs['call']}
+                    "name": call_leg['name'],
+                    "remoteParty": call_leg['remoteParty'],
+                    "call": call_leg['call']}
 
         return call_legs
 
@@ -632,8 +635,8 @@ class Cms(Bridges):
             resp = s.get(req_url, verify=self.__ssl_is_valid, timeout=10)
             xml_resp = xmltodict.parse(resp.text)
         except Exception as err:
-            return err
-
+            return False
+        
         root = xml_resp['callLeg']
 
         leg = dict()
@@ -643,7 +646,8 @@ class Cms(Bridges):
         txVideo = dict()
         leg['id'] = root['@id']
         leg['name'] = root['name']
-        leg['localAddress'] = root['localAddress']
+        if 'localAddress' in root:
+            leg['localAddress'] = root['localAddress']
         leg['direction'] = root['direction']
         leg['durationSeconds'] = root['status']['durationSeconds']
         leg['direction'] = root['status']['direction']
