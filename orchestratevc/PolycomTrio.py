@@ -40,15 +40,17 @@ class PolycomTrio:
         try:
             response = session.post(
                 "https://" + self.get_address() + "/api/v1/mgmt/safeRestart",
+				headers={"Content-Type": "application/json"},
                 verify=False, # Most Trio deployments use self-signed certificates
                 timeout=2
             )
 
-            if json.dumps(response.text["result"] == 2000):
+			# {"Status": "2000"} Indicates the request was successful,
+            # and the Trio is rebooting.
+            if json.loads(response.text)["Status"] == "2000":
                 return "success"
             else:
                 return response.text
 
-        except Exception as e:
-            return e
-        
+        	except (requests.ConnectTimeout) as e:
+	            return "Connection timeout"
