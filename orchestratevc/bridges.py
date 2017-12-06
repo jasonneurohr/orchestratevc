@@ -101,6 +101,7 @@ class Cms(Bridges):
         self.__url_api_clps = self.__url_api + 'calllegprofiles' # callLegProfiles
         self.__url_api_cps = self.__url_api + 'callprofiles' # callProfiles
         self.__url_api_calls = self.__url_api + 'calls'
+        self.__url_api_calllegs = self.__url_api + 'calllegs'
         self.__url_api_cospaces = self.__url_api + 'cospaces'
         self.__url_api_mlic = self.__url_api + 'system/multipartyLicensing' # multipartyLicensing
         self.__ssl_is_valid = self.valid_certificate()
@@ -479,7 +480,38 @@ class Cms(Bridges):
             limit (int): object return limit
         
         Returns:
+            dict: a dict containing call records
         """
+
+        calls = dict()
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        req_url = self.__url_api_calls
+
+        try:
+            resp = s.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+            xml_resp = xmltodict.parse(resp.text)
+        except Exception as err:
+            return err
+        
+        if int(xml_resp['calls']['@total']) == 1:
+            call_id = xml_resp['calls']['call']['@id']
+            calls[call_id] = {
+                'name': xml_resp['calls']['call']['name'],
+                'coSpace': xml_resp['calls']['call']['coSpace'],
+                'callCorrelator': xml_resp['calls']['call']['callCorrelator']}
+
+        elif int(xml_resp['calls']['@total']) > 1:
+            for call in xml_resp['calls']['call']:
+                call_id = call['@id']
+                calls[call_id] = {
+                    "name": call['name'],
+                    "coSpace": call['coSpace'],
+                    "callCorrelator": call['callCorrelator']}
+
+        return calls
+
     
     def get_call(self, call_id):
         """Get specific call details
@@ -518,6 +550,74 @@ class Cms(Bridges):
         Returns:
         """
 
+        if call_id is None:
+            return False
+
+        call_legs = dict()
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        req_url = self.__url_api_calls + '/' + call_id + '/calllegs/' 
+
+        try:
+            resp = s.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+            xml_resp = xmltodict.parse(resp.text)
+        except Exception as err:
+            return err
+        
+        if int(xml_resp['callLegs']['@total']) == 1:
+            call_leg_id = xml_resp['callLegs']['callLeg']['@id']
+            call_legs[call_leg_id] = {
+                'name': xml_resp['callLegs']['callLeg']['name'],
+                'remoteParty': xml_resp['callLegs']['callLeg']['remoteParty'],
+                'call': xml_resp['callLegs']['callLeg']['call']}
+
+        elif int(xml_resp['callLegs']['@total']) > 1:
+            for call_leg in xml_resp['callLegs']['callLeg']:
+                call_leg_id = call_leg['@id']
+                call_legs[call_leg_id] = {
+                    "name": call_leg['name'],
+                    "remoteParty": call_leg['remoteParty'],
+                    "call": call_leg['call']}
+
+        return call_legs
+
+    def get_correlated(self, call_correlator):
+        """Get call ID from call matching the callCorrelator ID
+
+        Args:
+            call_correlator (str): callCorrelator ID
+
+        Returns:
+            str: call ID
+        """
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        req_url = self.__url_api_calls
+
+        try:
+            resp = s.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+            xml_resp = xmltodict.parse(resp.text)
+        except Exception as err:
+            return err
+
+        total_calls = int(xml_resp['calls']['@total'])
+        
+        if total_calls == 1:
+            return xml_resp['calls']['call']['@id']
+        if total_calls > 1:
+            offset = 0
+            while offset != total_calls:
+                req_url = self.__url_api_calls + '?offset=' + str(offset) + '&limit=10'
+                resp = s.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+                xml_resp = xmltodict.parse(resp.text)
+                for call in xml_resp['calls']['call']:
+                    if call['callCorrelator'] == call_correlator:
+                        return call['@id']
+                        
+        return None
+
     def get_leg(self, leg_id):
         """Get specific call leg details
 
@@ -527,7 +627,100 @@ class Cms(Bridges):
         Returns:
         """
 
-    def mod_leg(self, leg_id):
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        req_url = self.__url_api_calllegs + '/' + leg_id
+
+        try:
+            resp = s.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+            xml_resp = xmltodict.parse(resp.text)
+        except Exception as err:
+            return False
+        
+        root = xml_resp['callLeg']
+
+        leg = dict()
+        rxAudio = dict()
+        txAudio = dict()
+        rxVideo = dict()
+        txVideo = dict()
+        leg['id'] = root['@id']
+        leg['name'] = root['name']
+        if 'localAddress' in root:
+            leg['localAddress'] = root['localAddress']
+        leg['direction'] = root['direction']
+        leg['durationSeconds'] = root['status']['durationSeconds']
+        leg['direction'] = root['status']['direction']
+        leg['layout'] = root['status']['layout']
+        leg['remoteParty'] = root['remoteParty']
+        rxAudio['codec'] = root['status']['rxAudio']['codec']
+        rxAudio['packetLossPercentage'] = root['status']['rxAudio']['packetLossPercentage']
+        rxAudio['jitter'] = root['status']['rxAudio']['jitter']
+        rxAudio['bitRate'] =  root['status']['rxAudio']['bitRate']
+        leg['rxAudio'] = rxAudio
+        txAudio['codec'] = root['status']['txAudio']['codec']
+        txAudio['packetLossPercentage'] = root['status']['txAudio']['packetLossPercentage']
+        txAudio['jitter'] = root['status']['txAudio']['jitter']
+        txAudio['bitRate'] =  root['status']['txAudio']['bitRate']
+        leg['txAudio'] = txAudio
+        rxVideo['codec'] = root['status']['rxVideo']['codec']
+        rxVideo['packetLossPercentage'] = root['status']['rxVideo']['packetLossPercentage']
+        rxVideo['jitter'] = root['status']['rxVideo']['jitter']
+        rxVideo['bitRate'] = root['status']['rxVideo']['bitRate']
+        rxVideo['width'] = root['status']['rxVideo']['width']
+        rxVideo['height'] = root['status']['rxVideo']['height']
+        rxVideo['frameRate'] = root['status']['rxVideo']['frameRate']
+        leg['rxVideo'] = rxVideo
+        txVideo['codec'] = root['status']['txVideo']['codec']
+        txVideo['packetLossPercentage'] = root['status']['txVideo']['packetLossPercentage']
+        txVideo['jitter'] = root['status']['txVideo']['jitter']
+        txVideo['bitRate'] = root['status']['txVideo']['bitRate']
+        txVideo['width'] = root['status']['txVideo']['width']
+        txVideo['height'] = root['status']['txVideo']['height']
+        txVideo['frameRate'] = root['status']['txVideo']['frameRate']
+        leg['txVideo'] = txVideo
+
+        return(leg)
+
+    def del_leg(self, leg_id):
+        """Delete an active call leg (end a call)
+
+        Args:
+            leg_id (str): the call leg id
+
+        Returns:
+        """
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        req_url = self.__url_api_calllegs + '/' + leg_id
+
+        try:
+            resp = s.delete(req_url, verify=self.__ssl_is_valid, timeout=10)
+        except Exception as err:
+            return err
+
+    def new_leg(self, call_id, remote_party):
+        """Creates a new call leg (new outbound call)
+
+        Args:
+            call_id (str): the call id
+
+        Returns:
+        """
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        req_url = self.__url_api_calls + '/' + call_id + '/participants'
+
+        data = {'remoteParty': remote_party}
+
+        try:
+            resp = s.post(req_url, data=data, verify=self.__ssl_is_valid, timeout=10)
+        except Exception as err:
+            return err
+
+    def mod_leg(self, leg_id, prop, val):
         """Modify an active call leg
 
         Args:
@@ -535,6 +728,19 @@ class Cms(Bridges):
 
         Returns:
         """
+
+        s = requests.session()
+        s.auth = self.get_api_user(), self.get_api_pass()
+        req_url = self.__url_api_calllegs + '/' + leg_id
+
+        data = {prop:val}
+
+        try:
+            resp = s.put(req_url, data=data, verify=self.__ssl_is_valid, timeout=10)
+            xml_resp = xmltodict.parse(resp.text)
+        except Exception as err:
+            return err
+
     def get_licensing(self):
         """Get CMS multipartyLicensing details
 
@@ -587,6 +793,10 @@ class Tps(Bridges):
         self.__serial = None
         self.__sys_name = None
         self.__utf_offset = None
+        self.__build_ver = None
+        self.__total_vports = None
+        self.__total_aports = None
+        self.__total_cports = None
 
     def valid_certificate(self):
         """Check certificate validity
@@ -620,13 +830,50 @@ class Tps(Bridges):
             '</methodCall>').format(self.get_api_pass(), self.get_api_user())
 
         s = requests.session()
+
+        try:
+            resp = s.get(self.__url_sys, verify=self.__ssl_is_valid, timeout=10)
+        except Exception as err:
+            return err
+
+        # Get system details from the system.xml
+        xml_resp = xmltodict.parse(r.text)
+        self.__serial = xml_resp['system']['serial']
+        self.__build_ver = xml_resp['system']['buildVersion']
+        self.__total_vports = int(xml_resp['system']['totalVideoPorts'])
+        self.__total_aports = int(xml_resp['system']['totalAudioPorts'])
+        self.__total_cports = int(xml_resp['system']['totalContentPorts'])
+
         try:
             resp = s.post(self.__url_api, verify=self.__ssl_is_valid, timeout=10)
         except Exception as err:
             return err
 
-        #xml_resp = xmltodict.parse(r.text)
-        #xml_path = xml_resp["methodResponse"]["params"]["param"]["value"]["struct"]["member"]
+        # Get basic system details from the system.info API method
+        xml_resp = xmltodict.parse(r.text)
+        xml_path = xml_resp["methodResponse"]["params"]["param"]["value"]["struct"]["member"]
+
+        # Conductor/Remotely managed specific
+        if xml_path[4]['name'] == 'depHash':
+            if self.__build_ver == '13.1(1.95)':
+                __vports_free = int(xml_path[10]['value']['int'])
+                __vports_used = self.__total_vports - __vports_free
+                __aports_free = int(xml_path[12]['value']['int'])
+                __aports_used = self.__total_aports - __aports_free
+                __cports_free = int(xml_path[14]['value']['int'])
+                __cports_used = self.__total_cports - __cports_free
+                if xml_path[19]['value']['string'] == 'slave':
+                    __license_mode = None
+                else:
+                    __license_mode = xml_path[20]['value']['string']
+        
+        # Locally managed mode specific
+        else:
+            if self.__build_ver == '13.1(1.95)':
+                __offset = -1
+            else:
+                __offset = 0
+
 
     def get_serial(self):
         return

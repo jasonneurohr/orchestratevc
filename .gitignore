@@ -3,4 +3,8 @@ tmp
 orchestratevc/__pycache__
 orchestratevc/test.py
 utils
+<<<<<<< HEAD
 .vscode
+=======
+.vs
+>>>>>>> 369e4e95cc6a9df1e7a1f85a6067b9b825675f96
