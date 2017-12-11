@@ -1,5 +1,6 @@
 import json
 import requests
+import datetime
 
 class PolycomTrio:
 
@@ -126,6 +127,8 @@ class PolycomTrio:
             return "Connection timeout"
     
     def get_config(self, config_params=[]):
+        # Example POST Data
+        # {"data":["tcpIpApp.sntp.gmtOffset","tcpIpApp.sntp.daylightSavings.enable"]}
         data = json.dumps({"data": config_params}) # Create JSON structure
         session = requests.session()
         session.auth = self.get_username(), self.get_password()
@@ -155,8 +158,10 @@ class PolycomTrio:
                 verify=False, # Most Trio deployments use self-signed certificates
                 timeout=2
             )
-        
-            return response.headers
+
+            # The HTTP Header format is: Sun, 10 Dec 2017 18:17:41 GMT
+            # It is converted to ISO8601 format YYYY-MM-DDTHH:MM:SS (without microseconds)
+            return datetime.datetime.strptime(response.headers["date"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
 
         except (requests.ConnectTimeout) as e:
             return "Connection timeout"
