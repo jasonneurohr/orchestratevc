@@ -159,7 +159,7 @@ class PolycomTrio:
                 timeout=2
             )
 
-            # The HTTP Header format is: Sun, 10 Dec 2017 18:17:41 GMT
+            # The HTTP Header format is: Sun, 10 Dec 2017 18:17:41 GMT 
             # It is converted to ISO8601 format YYYY-MM-DDTHH:MM:SS (without microseconds)
             return datetime.datetime.strptime(response.headers["date"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
 
