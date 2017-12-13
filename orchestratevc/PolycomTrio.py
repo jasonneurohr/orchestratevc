@@ -37,11 +37,8 @@ class PolycomTrio:
         self.__password = password
 
     def safe_restart(self):
-        # session = requests.session()
-        # session.auth = self.get_username(), self.get_password()
-
         try:
-            response = session.post(
+            response = self.__session.post(
                 "https://" + self.get_address() + "/api/v1/mgmt/safeRestart",
                 headers={"Content-Type": "application/json"},
                 verify=False, # Most Trio deployments use self-signed certificates
@@ -59,11 +56,8 @@ class PolycomTrio:
             return "Connection timeout"
 
     def network_info(self):
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-
         try:
-            response = session.get(
+            response = self.__session.get(
                 "https://" + self.get_address() + "/api/v1/mgmt/network/info",
                 headers={"Content-Type": "application/json"},
                 verify=False, # Most Trio deployments use self-signed certificates
@@ -76,11 +70,8 @@ class PolycomTrio:
             return "Connection timeout"
 
     def device_info(self):
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-
         try:
-            response = session.get(
+            response = self.__session.get(
                 "https://" + self.get_address() + "/api/v1/mgmt/device/info",
                 headers={"Content-Type": "application/json"},
                 verify=False, # Most Trio deployments use self-signed certificates
@@ -93,11 +84,8 @@ class PolycomTrio:
             return "Connection timeout"
 
     def line_info(self):
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-
         try:
-            response = session.get(
+            response = self.__session.get(
                 "https://" + self.get_address() + "/api/v1/mgmt/lineInfo",
                 headers={"Content-Type": "application/json"},
                 verify=False, # Most Trio deployments use self-signed certificates
@@ -110,11 +98,8 @@ class PolycomTrio:
             return "Connection timeout"
 
     def network_stats(self):
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-
         try:
-            response = session.get(
+            response = self.__session.get(
                 "https://" + self.get_address() + "/api/v1/mgmt/network/stats",
                 headers={"Content-Type": "application/json"},
                 verify=False, # Most Trio deployments use self-signed certificates
@@ -130,29 +115,28 @@ class PolycomTrio:
         # Example POST Data
         # {"data":["tcpIpApp.sntp.gmtOffset","tcpIpApp.sntp.daylightSavings.enable"]}
         data = json.dumps({"data": config_params}) # Create JSON structure
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
 
         try:
-            response = session.post(
+            response = self.__session.post(
                 "https://" + self.get_address() + "/api/v1/mgmt/config/get",
                 headers={"Content-Type": "application/json"},
                 data=data,
                 verify=False, # Most Trio deployments use self-signed certificates
                 timeout=2
             )
-        
-            return response.json()
 
-        except (requests.ConnectTimeout) as e:
-            return "Connection timeout"
+            # TODO
+            try:
+                return response.json()["data"]
+            except Exception as e:
+                return "-1"
+
+        except (requests.exceptions.RequestException) as e:
+            return "-1"
 
     def get_time(self):
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-
         try:
-            response = session.get(
+            response = self.__session.get(
                 "https://" + self.get_address() + "/api/v1/mgmt/network/stats",
                 headers={"Content-Type": "application/json"},
                 verify=False, # Most Trio deployments use self-signed certificates
@@ -163,5 +147,5 @@ class PolycomTrio:
             # It is converted to ISO8601 format YYYY-MM-DDTHH:MM:SS (without microseconds)
             return datetime.datetime.strptime(response.headers["date"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
 
-        except (requests.ConnectTimeout) as e:
-            return "Connection timeout"
+        except (requests.exceptions.RequestException) as e:
+            return "-1"
