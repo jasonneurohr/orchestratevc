@@ -116,4 +116,3 @@ class CiscoUcmRis:
             sentinal += 1
 
         return devices
-            

@@ -16,3 +16,8 @@ Collections inside the **reporting** database should be created as:
 * **util_cisco_expressway_license** - Cisco Expressway license utilisation data (and Video Communications Server, VCS)
 
 There are several scripts within the docker db folder to take care of setting up MongoDB and also for populating dummy data for testing.
+
+# CiscoUcmRis
+
+References
+* https://d1nmyq4gcgsfi5.cloudfront.net/site/sxml/documents/api-reference/risport/#StateInfoUsage
