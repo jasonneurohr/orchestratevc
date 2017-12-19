@@ -133,6 +133,30 @@ class PolycomTrio:
 
         except (requests.exceptions.RequestException) as e:
             return "-1"
+    
+    def set_config(self, config_params={}):
+        # Example POST Data
+        # {"data":{"tcpIpApp.sntp.gmtOffset": "1.1.1.1")}
+        data = json.dumps({"data": config_params}) # Create JSON structure
+        print(data)
+
+        try:
+            response = self.__session.post(
+                "https://" + self.get_address() + "/api/v1/mgmt/config/set",
+                headers={"Content-Type": "application/json"},
+                data=data,
+                verify=False, # Most Trio deployments use self-signed certificates
+                timeout=2
+            )
+
+            # {"Status": "2000"} Indicates the request was successful
+            if json.loads(response.text)["Status"] == "2000":
+                return "1"
+            else:
+                return json.loads(response.text)["Status"] # Return the response from the Trio if not 2000
+
+        except (requests.exceptions.RequestException) as e:
+            return "-1"
 
     def get_time(self):
         try:

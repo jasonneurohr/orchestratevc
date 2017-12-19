@@ -112,7 +112,7 @@ class CiscoUcmRis:
 
         # Loop through response and build dict of devices
         while sentinal < response["SelectCmDeviceResult"]["TotalDevicesFound"]:
-            devices[response["SelectCmDeviceResult"]["CmNodes"]["item"][0]["CmDevices"]["item"][sentinal]["Name"]] = response["SelectCmDeviceResult"]["CmNodes"]["item"][0]["CmDevices"]["item"][0]["IPAddress"]["item"][0]["IP"]
+            devices[response["SelectCmDeviceResult"]["CmNodes"]["item"][0]["CmDevices"]["item"][sentinal]["Name"]] = response["SelectCmDeviceResult"]["CmNodes"]["item"][0]["CmDevices"]["item"][sentinal]["IPAddress"]["item"][0]["IP"]
             sentinal += 1
 
         return devices

@@ -13,7 +13,8 @@ class CiscoUcmAxl:
         self.__address = str(address)       # The CUCM address IP or FQDN
         self.__username = str(username)     # CUCM User with AXL permissions
         self.__password = str(password)
-        self.__wsdl = "file://" + wsdl      # The WSDL file (downloaded from CUCM)
+        # self.__wsdl = "file://" + wsdl      # The WSDL file (downloaded from CUCM)
+        self.__wsdl = wsdl
         
         # Setup Requests session
         self.__session = requests.session()
