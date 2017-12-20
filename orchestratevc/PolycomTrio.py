@@ -35,6 +35,9 @@ class PolycomTrio:
 
     def set_password(self, password):
         self.__password = password
+    
+    def end_session(self):
+        self.__session.close()
 
     def safe_restart(self):
         try:
@@ -138,7 +141,6 @@ class PolycomTrio:
         # Example POST Data
         # {"data":{"tcpIpApp.sntp.gmtOffset": "1.1.1.1")}
         data = json.dumps({"data": config_params}) # Create JSON structure
-        print(data)
 
         try:
             response = self.__session.post(
