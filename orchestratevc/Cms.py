@@ -5,48 +5,14 @@ import xmltodict
 
 class Cms:
     """Cisco Meeting Server (CMS)
-
-    Methods:
-        ~ accessMethods:
-            del_am(self, space_id, am_id)
-            set_am(self, space_id, am_id=None, properties=None)
-            get_am(self, space_id, am_id)
-        ~ callLegs
-            get_legs(self, call_id=None)
-            get_leg(self, leg_id)
-            mod_leg(self, leg_id)
-        ~ callLegProfiles:
-        ~ callProfiles:
-            get_cps(self)
-            get_cp(self, cp_id)
-        ~ calls:
-            conf_count(self)
-            get_calls(self, limit=None, offset=None)
-            get_call(self, call_id)
-        ~ coSpaces:
-            query_spaces(self, query, limit=None, offset=None)
-        ~ misc:
-            valid_certificate(self)
-        ~ system:
-            get_licensing(self)
     """
     def __init__(self, address, username, password, port='443'):
         self.__address = str(address)
         self.__port = str(port)
         self.__username = str(username)
         self.__password = str(password)
-
-        """Initialise a Cms object
-        self.__ssl_is_valid will call the valid_certificate(self) method,
-        to determine whether the CMS certificate is valid.
-
-        Args:
-            __api_host (str): IP address or resolvable name of the device.
-            __api_port (str): TCP port where the API/XML is accessible.
-                Defaults to port 443
-            __api_user (str): Username to access the device.
-            __api_pass (str): Password to access the device.
-        """
+        self.__session = requests.session()
+        self.__session.auth = self.get_username(), self.get_password()
 
         self.__url_api = "https://{address}:{port}/api/v1/".format(
             address=self.get_address(),
@@ -87,22 +53,60 @@ class Cms:
             bool: True if certificate is valid. Otherwise False
         """
 
-        s = requests.session()
-        s.auth = self.get_username(), self.get_password()
+
         try:
-            resp = s.get(self.__url_api_calls, timeout=10)
+            resp = self.__session.get(self.__url_api_calls, timeout=5)
         except requests.exceptions.SSLError as err:
             # SSL Cert is invalid, fall back to non-verify
             return False
         return True
 
+    def __get_req(self, url):
+        try:
+            response = self.__session.get(
+                url,
+                verify=self.__ssl_is_valid,
+                timeout=5)
+
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
+            print(err)
+            raise
+
+        return response
+
+    def __post_req(self, url, properties=None):
+        try:
+            response = self.__session.post(
+                url,
+                verify=self.__ssl_is_valid,
+                data=properties,
+                timeout=5)
+
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
+            print(err)
+            raise
+
+        return response
+
+    def __put_req(self, url, properties=None):
+        try:
+            response = self.__session.put(
+                url,
+                verify=self.__ssl_is_valid,
+                data=properties,
+                timeout=5)
+
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
+            print(err)
+            raise
+
+        return response
+
     def get_spaces(self):
         """Get coSpace objects
         """
 
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-        response = session.get(self.__url_api_cospaces, verify=False, timeout=10)
+        response = self.__session.get(self.__url_api_cospaces, verify=False, timeout=5)
         xml_response = xmltodict.parse(response.text)
         total_spaces = int(xml_response['coSpaces']['@total'])
         space_dict = {}
@@ -123,7 +127,7 @@ class Cms:
             offset = 0
             while offset != total_spaces:
                 req_url = self.__url_api_cospaces + '?offset=' + str(offset) + '&limit=10'
-                response = session.get(req_url, verify=False, timeout=10)
+                response = self.__session.get(req_url, verify=False, timeout=5)
                 xml_response = xmltodict.parse(response.text)
 
                 # Get the initial response items
@@ -133,16 +137,14 @@ class Cms:
                     space_name = space['name']
                     space_dict[space_id] = space_name
             return space_dict
-        session.close()
 
     def get_space_callprofile(self, space_id):
         """
         """
 
         req_url = self.__url_api_cospaces + '/' + space_id
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-        response = session.get(req_url, verify=False, timeout=10)
+
+        response = self.__session.get(req_url, verify=False, timeout=5)
         xml_response = xmltodict.parse(response.text)
 
         try:
@@ -150,7 +152,6 @@ class Cms:
             has_callprofile = 1
         except:
             has_callprofile = 0
-            pass
 
         if has_callprofile == 1:
             return callprofile_id
@@ -166,10 +167,9 @@ class Cms:
 
         accessmethod_ids = []
         req_url = self.__url_api_cospaces + '/' + space_id + "/accessmethods/"
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
+
         try:
-            resp = session.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+            resp = self.__session.get(req_url, verify=self.__ssl_is_valid, timeout=5)
             xml_resp = xmltodict.parse(resp.text)
         except Exception as err:
             return err
@@ -190,9 +190,7 @@ class Cms:
         """
         """
 
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-        response = session.get(self.__url_api_cospaces, verify=False, timeout=10)
+        response = self.__session.get(self.__url_api_cospaces, verify=False, timeout=5)
         xml_response = xmltodict.parse(response.text)
         try:
             calllegprofile_id = xml_response['accessMethod']['callLegProfile']
@@ -207,10 +205,8 @@ class Cms:
             int: total conference count
         """
 
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
         try:
-            resp = session.get(self.__url_api_calls, verify=self.__ssl_is_valid, timeout=10)
+            resp = self.__session.get(self.__url_api_calls, verify=self.__ssl_is_valid, timeout=5)
         except Exception as err:
             return err
         xml_resp = xmltodict.parse(resp.text)
@@ -226,9 +222,7 @@ class Cms:
         """
         """
 
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-        response = session.get(self.__url_api_clps, verify=False, timeout=10)
+        response = session.get(self.__url_api_clps, verify=False, timeout=5)
         xml_response = xmltodict.parse(response.text)
         total_profiles = int(xml_response['callLegProfiles']['@total'])
 
@@ -238,27 +232,25 @@ class Cms:
         if total_profiles == 1:  # Only 1 profile
             calllegprofile_id = xml_response['callLegProfiles']['callLegProfile']['@id']
             url_secure_api = self.__url_api_clps + '/' + calllegprofile_id
-            response = session.put(url_secure_api, data=properties, verify=False, timeout=10)
+            response = self.__session.put(url_secure_api, data=properties, verify=False, timeout=5)
             return
 
         offset = 0
         while offset != total_profiles:
             url_secure_api = self.__url_api_clps + '?offset=' + str(offset) + '&limit=10'
-            response = session.get(url_secure_api, verify=False, timeout=10)
+            response = self.__session.get(url_secure_api, verify=False, timeout=5)
             xml_response = xmltodict.parse(response.text)
 
             for calllegprofile in xml_response['callLegProfiles']['callLegProfile']:
                 offset += 1
                 calllegprofile_id = str(calllegprofile['@id'])
                 url_secure_api = self.__url_api_clps + '/' + calllegprofile_id
-                response = session.put(url_secure_api, data=properties, verify=False, timeout=10)
+                response = self.__session.put(url_secure_api, data=properties, verify=False, timeout=5)
                 print(response.text)
         return
 
     def del_spaces_and_artifacts(self, filter_string=None):
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-        response = session.get(self.__url_api_cospaces, verify=False, timeout=10)
+        response = self.__session.get(self.__url_api_cospaces, verify=False, timeout=5)
         xml_response = xmltodict.parse(response.text)
         total_spaces = int(xml_response['coSpaces']['@total'])
 
@@ -275,7 +267,7 @@ class Cms:
 
             if callprofile_id is not None:  # Space has a profile which will be deleted
                 req_url = self.__url_api_cps + "/" + callprofile_id
-                session.delete(req_url, verify=False, timeout=10)
+                self.__session.delete(req_url, verify=False, timeout=5)
 
             accessmethod_ids = self.get_space_accessmethods(space_id)
 
@@ -283,18 +275,18 @@ class Cms:
                 calllegprofile_id = self.get_space_calllegprofiles(space_id, accessmethod_ids)
                 if callprofile_id is not None:
                     req_url = self.__url_api_clps + '/' + calllegprofile_id
-                    session.delete(req_url, verify=False, timeout=10)
+                    self.__session.delete(req_url, verify=False, timeout=5)
 
             if type(accessmethod_ids) == list:  # Multiple access methods
                 for accessmethod_id in accessmethod_ids:
                     calllegprofile_id = self.get_space_calllegprofiles(space_id,accessmethod_id)
                     if calllegprofile_id is not None:
                         req_url = self.__url_api_clps + '/' + calllegprofile_id
-                        session.delete(req_url, verify=False, timeout=10)
+                        self.__session.delete(req_url, verify=False, timeout=5)
 
             # Finally delete the space (and subsequently the access methods)
             req_url = self.__url_api_cospaces + '/' + space_id
-            session.delete(req_url, verify=False, timeout=10)
+            self.__session.delete(req_url, verify=False, timeout=5)
 
         if total_spaces > 1:
             for space in xml_response['coSpaces']['coSpace']:
@@ -307,7 +299,7 @@ class Cms:
                 else:
                     if callprofile_id is not None:  # Space has a profile which will be deleted
                         req_url = self.__url_api_cps + '/' + callprofile_id
-                        session.delete(req_url, verify=False, timeout=10)
+                        self.__session.delete(req_url, verify=False, timeout=5)
 
                     accessmethod_ids = self.get_space_accessmethods(space_id)
 
@@ -315,18 +307,18 @@ class Cms:
                         calllegprofile_id = self.get_space_calllegprofiles(space_id, accessmethod_id)
                         if callprofile_id is not None:
                             req_url = self.__url_api_clps + '/' + calllegprofile_id
-                            session.delete(req_url, verify=False, timeout=10)
+                            self.__session.delete(req_url, verify=False, timeout=5)
 
                     if type(accessmethod_ids) == list:  # Multiple access methods
                         for accessmethod_id in accessmethod_ids:
                             calllegprofile_id = self.get_space_calllegprofiles(space_id, accessmethod_id)
                             if calllegprofile_id is not None:
                                 req_url = self.__url_api_clps + '/' + calllegprofile_id
-                                session.delete(req_url, verify=False, timeout=10)
+                                self.__session.delete(req_url, verify=False, timeout=5)
 
                     # Finally delete the space (and subsequently the access methods)
                     req_url = self.__url_api_cospaces + '/' + space_id
-                    session.delete(req_url, verify=False, timeout=10)
+                    self.__session.delete(req_url, verify=False, timeout=5)
 
     def set_am(self, space_id, am_id=None, properties=None):
         """Set Access Method properties
@@ -343,14 +335,11 @@ class Cms:
             bool: True for success. False otherwise
         """
 
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-
         if am_id is None:
             # accessMethod doesn't already exist. POST
             req_url = self.__url_api_cospaces + '/' + space_id + '/accessmethods/'
             try:
-                resp = s.post(req_url, verify=self.__ssl_is_valid, data=properties, timeout=10)
+                resp = self.__post_req(req_url, properties)
             except Exception as err:
                 return err
             return True
@@ -358,7 +347,7 @@ class Cms:
             # Existing accessMethod. PUT
             req_url = self.__url_api_cospaces + '/' + space_id + '/accessmethods/' + am_id
             try:
-                resp = session.put(req_url, verify=self.__ssl_is_valid, data=properties, timeout=10)
+                resp = self.__put_req(req_url, properties)
             except Exception as err:
                 return err
             if resp.status_code == 400:
@@ -379,12 +368,9 @@ class Cms:
             bool: True for success. False otherwise
         """
 
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-
         req_url = self.__url_api_cospaces + '/' + space_id + '/accessmethods/' + am_id
         try:
-            resp = session.delete(req_url, verify=self.__ssl_is_valid, timeout=10)
+            resp = self.__session.delete(req_url, verify=self.__ssl_is_valid, timeout=5)
         except Exception as err:
             return err
         if resp.status_code == 400:
@@ -415,8 +401,6 @@ class Cms:
         """
 
         space_dict = {}
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
 
         req_url = self.__url_api_cospaces + '?filter=' + str(query)
 
@@ -426,7 +410,7 @@ class Cms:
             req_url += '&offset=' + str(offset)
 
         try:
-            resp = session.get(req_url, verify=self.__ssl_is_valid, timeout=10)
+            resp = self.__get_req(req_url)
         except Exception as err:
             return err
 
@@ -516,13 +500,7 @@ class Cms:
             dict: dict of license properties
         """
 
-        session = requests.session()
-        session.auth = self.get_username(), self.get_password()
-
-        try:
-            resp = session.get(self.__url_api_mlic, verify=self.__ssl_is_valid, timeout=10)
-        except Exception as err:
-            return err
+        resp = self.__get_req(self.__url_api_mlic)
 
         xml_resp = xmltodict.parse(resp.text)['multipartyLicensing']
         # Convert time_stamp str to datetime object for correct insertion into MongoDB
@@ -530,3 +508,39 @@ class Cms:
             xml_resp['timestamp'], '%Y-%m-%dT%H:%M:%SZ')
 
         return xml_resp
+
+    def add_dtmf_profile(self, properties=None):
+        url = self.__url_api + "dtmfprofiles"
+        return self.__post_req(url, properties)
+
+    def add_ivr(self, properties=None):
+        url = self.__url_api + "ivrs"
+        return self.__post_req(url, properties)
+    
+    def add_call_leg_profile(self, properties=None):
+        url = self.__url_api + "calllegprofiles"
+        return self.__post_req(url, properties)
+    
+    def add_turn_server(self, properties=None):
+        url = self.__url_api + "turnservers"
+        return self.__post_req(url, properties)
+
+    def add_user_profile(self, properties=None):
+        url = self.__url_api + "userProfiles"
+        return self.__post_req(url, properties)
+
+    def add_webbridge(self, properties=None):
+        url = self.__url_api + "webbridges"
+        return self.__post_req(url, properties)
+    
+    def add_compatibility_profile(self, properties=None):
+        url = self.__url_api + "compatibilityprofiles"
+        return self.__post_req(url, properties)
+    
+    def add_cdr_receiver(self, properties=None):
+        url = self.__url_api + "system/cdrreceivers"
+        return self.__post_req(url, properties)
+    
+    def set_xmpp(self, properties=None):
+        url = self.__url_api + "system/configuration/xmpp"
+        return self.__post_req(url, properties)
