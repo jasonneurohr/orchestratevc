@@ -175,3 +175,71 @@ class PolycomTrio:
 
         except (requests.exceptions.RequestException) as e:
             return "-1"
+
+    def start_call(self, config_params):
+        """
+        Example
+        {"data":{"dest":"0123456789"}}
+        """
+        data = json.dumps({"data": config_params}) # Create JSON structure
+
+        try:
+            response = self.__session.post(
+                "https://" + self.get_address() + "/api/v1/callctrl/dial",
+                headers={"Content-Type": "application/json"},
+                data=data,
+                verify=False, # Most Trio deployments use self-signed certificates
+                timeout=2
+            )
+
+            # {"Status": "2000"} Indicates the request was successful
+            if json.loads(response.text)["Status"] == "2000":
+                return "1"
+            else:
+                return json.loads(response.text)["Status"] # Return the response from the Trio if not 2000
+
+        except (requests.exceptions.RequestException) as e:
+            return "-1"
+
+    def get_callstatus(self):
+        try:
+            response = self.__session.get(
+                "https://" + self.get_address() + "/api/v1/webCallControl/callStatus",
+                headers={"Content-Type": "application/json"},
+                verify=False, # Most Trio deployments use self-signed certificates
+                timeout=2
+            )
+
+            # TODO
+            try:
+                return response.json()["data"]
+            except Exception as e:
+                return "-1"
+
+        except (requests.exceptions.RequestException) as e:
+            return "-1"
+    
+    def end_call(self, config_params):
+        """
+        Example
+        {"data":{"Ref":"0x2e13ee0"}}
+        """
+        data = json.dumps({"data": config_params}) # Create JSON structure
+
+        try:
+            response = self.__session.post(
+                "https://" + self.get_address() + "/api/v1/callctrl/dial",
+                headers={"Content-Type": "application/json"},
+                data=data,
+                verify=False, # Most Trio deployments use self-signed certificates
+                timeout=2
+            )
+
+            # {"Status": "2000"} Indicates the request was successful
+            if json.loads(response.text)["Status"] == "2000":
+                return "1"
+            else:
+                return json.loads(response.text)["Status"] # Return the response from the Trio if not 2000
+
+        except (requests.exceptions.RequestException) as e:
+            return "-1"

@@ -21,3 +21,23 @@ There are several scripts within the docker db folder to take care of setting up
 
 References
 * https://d1nmyq4gcgsfi5.cloudfront.net/site/sxml/documents/api-reference/risport/#StateInfoUsage
+
+# Polycom Trio
+
+## Setting *device.x* Configuration Parameters
+
+When utilising the set_config method with device.x configuration parameters you must also add the following to the JSON POST data (the dictionary being passed to the method), **"device.set":"1"** and **"device.*configparam*.set:"1"**. 
+
+See the following example to modify the provisioning server type (to http) and name.
+
+```json
+{
+	"data": {
+		"device.set": "1",
+		"device.prov.serverType.set": "1",
+		"device.prov.serverType": "2",
+		"device.prov.serverName.set": "1",
+		"device.prov.serverName": "http://1.1.1.1"
+	}
+}
+```
