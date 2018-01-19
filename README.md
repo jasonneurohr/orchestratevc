@@ -42,6 +42,56 @@ Content-Type: text/xml
 </soapenv:Envelope>
 ```
 
+## Example export of route patterns
+
+```python
+import orchestratvc
+import csv
+
+cucm = orchestratevc.CiscoUcmAxl("192.168.44.160", "admin", "pass@word1", "/path/axlsqltoolkit/schema/10.5/AXLAPI.wsdl")
+rps = cucm.get_routepattern()
+
+with open('export-routePatterns.csv', 'w', newline='') as csvfile:
+    fieldnames = []
+    for pattern in rps["return"]["routePattern"]:
+        for k,v in pattern.items():
+            fieldnames.append(k)
+        break
+
+    writer = csv.DictWriter(csvfile, fieldnames)
+    writer.writeheader()
+    for pattern in rps["return"]["routePattern"]:
+        writer.writerow(pattern)
+```
+
+```python
+import orchestratvc
+import csv
+
+cucm = orchestratevc.CiscoUcmAxl("192.168.44.160", "admin", "pass@word1", "/path/axlsqltoolkit/schema/10.5/AXLAPI.wsdl")
+rps = cucm.get_routepattern()
+
+fieldnames = []
+data = {}
+fieldnames_written = False
+
+with open('export-routePatterns.csv', 'w', newline='') as csvfile:
+    for pattern in rps["return"]["routePattern"]:
+        rp_dict = cucm.get_routepattern(pattern["uuid"])
+        for k,v in rp_dict["return"]["routePattern"].items():
+            if not fieldnames_written:
+                fieldnames.append(k)  
+                if k == "destination":
+                    data[k] = v["routeListName"]["_value_1"]
+                else:
+                    data[k] = v
+        if not fieldnames_written:            
+            writer = csv.DictWriter(csvfile, fieldnames)
+            writer.writeheader()
+            fieldnames_written = True
+        writer.writerow(rp_dict["return"]["routePattern"])
+```
+
 # CiscoUcmRis
 
 References

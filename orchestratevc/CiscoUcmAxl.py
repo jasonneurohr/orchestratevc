@@ -97,6 +97,26 @@ class CiscoUcmAxl:
     def get_osversion(self):
         return self.__service.getOSVersion()
 
-    def get_routepattern(self, criteria="%"):
+    def get_routepattern(self, uuid):
+        """Returns a specific route patterns details
+        """
+
+        return zeep.helpers.serialize_object(self.__service.getRoutePattern(uuid=uuid))
+
+    def get_routepatterns(self):
+        """Returns a list of route pattern dictionaries
+        """
+
+        list_of_patterns = []
+        rps = self.list_routepatterns()
+        for pattern in rps["return"]["routePattern"]:
+            list_of_patterns.append(self.get_routepattern(pattern["uuid"]))
+        return list_of_patterns
+
+        
+    def list_routepatterns(self, criteria="%"):
+        """Returns dictionary of route pattern uuids
+        """
+        
         # return self.__service.listRoutePattern(searchCriteria=criteria, returnedTags="LRoutePattern")
         return zeep.helpers.serialize_object(self.__service.listRoutePattern(searchCriteria=criteria, returnedTags="LRoutePattern"))
