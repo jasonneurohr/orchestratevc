@@ -96,3 +96,7 @@ class CiscoUcmAxl:
 
     def get_osversion(self):
         return self.__service.getOSVersion()
+
+    def get_routepattern(self, criteria="%"):
+        # return self.__service.listRoutePattern(searchCriteria=criteria, returnedTags="LRoutePattern")
+        return zeep.helpers.serialize_object(self.__service.listRoutePattern(searchCriteria=criteria, returnedTags="LRoutePattern"))

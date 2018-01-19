@@ -17,6 +17,31 @@ Collections inside the **reporting** database should be created as:
 
 There are several scripts within the docker db folder to take care of setting up MongoDB and also for populating dummy data for testing.
 
+# CiscoUCMAxl
+
+Example SOAP Request
+
+Headers:
+Authorization: Basic XXXX
+SOAPAction: CUCM:DB ver=10.5 listRoutePattern
+Content-Type: text/xml
+
+```xml
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns="http://www.cisco.com/AXL/API/10.5">
+    <soapenv:Header/>
+    <soapenv:Body>
+        <ns:listRoutePattern>
+        	<searchCriteria>
+        		<pattern>%</pattern>
+        	</searchCriteria>
+        	<returnedTags>
+        		<LRoutePattern></LRoutePattern>
+        	</returnedTags>
+        </ns:listRoutePattern>
+    </soapenv:Body>
+</soapenv:Envelope>
+```
+
 # CiscoUcmRis
 
 References
