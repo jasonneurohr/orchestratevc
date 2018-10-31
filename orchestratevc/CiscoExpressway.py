@@ -53,6 +53,7 @@ class CiscoExpressway:
         return response
 
     def __post_req(self, url, properties=None):
+        print("Postreq data: ", properties)
         try:
             response = self.__session.post(
                 url,
@@ -68,6 +69,7 @@ class CiscoExpressway:
         return response
 
     def __put_req(self, url, properties=None):
+        print("Putreq data: ", properties)
         try:
             response = self.__session.put(
                 url,
@@ -95,18 +97,6 @@ class CiscoExpressway:
             raise
 
         return response
-
-    def set_dns(self, properties=None):
-        """
-        DNSRequestsPortRange
-        DNSRequestsPortRangeEnd
-        DNSRequestsPortRangeStart
-        DomainName
-        SystemHostName
-        """
-
-        url = "https://" + self.__address + "/api/provisioning/common/dns/dns"
-        return self.__put_req(url, properties).text
     
     def get_dns(self):
         """READ DNS configuration
@@ -119,6 +109,12 @@ class CiscoExpressway:
     def mod_dns(self, properties=None):
         """UPDATE DNS configuration
 
+        DNSRequestsPortRange
+        DNSRequestsPortRangeEnd
+        DNSRequestsPortRangeStart
+        DomainName
+        SystemHostName
+
         Args:
             properties (dict): Dictionary of properties
 
@@ -129,15 +125,11 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/common/dns/dns"
         return self.__put_req(url, json.dumps(properties)).text
 
-    def new_dnsserver(self, address, index):
-        #TODO
+    def new_dnsserver(self):
+        #TODO : API doesn't appear to work correctly
         """CREATE a new DNS server
         """
-        data = {
-            "address": address,
-            "index": index
-        }
-
+        data=None
         url = "https://" + self.__address + "/api/provisioning/common/dns/dnsserver"
         return self.__post_req(url, json.dumps(data)).text
 
@@ -181,7 +173,7 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/common/protocol/sip/configuration"
-        self.__put_req(url, properties)
+        self.__put_req(url, json.dumps(properties))
 
     def get_sip(self):
         """READ SIP configuration
@@ -195,7 +187,7 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/common/qos"
-        self.__put_req(url, properties)
+        self.__put_req(url, json.dumps(properties))
 
     def get_qos(self):
         """READ QoS configuration
@@ -228,7 +220,7 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/common/searchrule"
-        self.__put_req(url, properties)
+        self.__put_req(url, json.dumps(properties))
     
     def del_searchrule(self, properties=None):
         """DELETE search rule
@@ -249,7 +241,7 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/common/time/ntpserver"
-        self.__post_req(url, properties)
+        self.__post_req(url, json.dumps(properties))
     
     def mod_ntpserver(self, properties=None):
         """UPDATE NTP server
@@ -326,7 +318,7 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/common/zone/neighborzone"
-        self.__post_req(url, properties)
+        self.__post_req(url, json.dumps(properties))
     
     def mod_neighborzone(self, properties=None):
         """UPDATE neighborzone
@@ -375,14 +367,14 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/controller/zone/traversalclient"
-        self.__post_req(url, properties)
+        self.__post_req(url, json.dumps(properties))
 
     def mod_zone_traversalclient(self, properties=None):
         """UPDATE traversalclient zone
         """
 
         url = "https://" + self.__address + "/api/provisioning/controller/zone/traversalclient"
-        self.__put_req(url, properties)
+        self.__put_req(url, json.dumps(properties))
 
     def del_zone_traversalclient(self, properties=None):
         """DELETE traversaclient zone
@@ -431,6 +423,34 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/edge/zone/traversalserver"
+        self.__delete_req(url, properties)
+
+    def get_uczone_traversalclient(self):
+        """READ traversalclient zone
+        """
+
+        url = "https://" + self.__address + "/api/provisioning/controller/zone/unifiedcommunicationstraversal"
+        self.__get_req(url)
+
+    def new_uczone_traversalclient(self, properties=None):
+        """CREATE traversalclient zone
+        """
+
+        url = "https://" + self.__address + "/api/provisioning/controller/zone/unifiedcommunicationstraversal"
+        self.__post_req(url, json.dumps(properties))
+
+    def mod_uczone_traversalclient(self, properties=None):
+        """UPDATE traversalclient zone
+        """
+
+        url = "https://" + self.__address + "/api/provisioning/controller/zone/unifiedcommunicationstraversal"
+        self.__put_req(url, json.dumps(properties))
+
+    def del_uczone_traversalclient(self, properties=None):
+        """DELETE traversaclient zone
+        """
+
+        url = "https://" + self.__address + "/api/provisioning/controller/zone/unifiedcommunicationstraversal"
         self.__delete_req(url, properties)
 
     def get_optionkey(self):

@@ -102,6 +102,19 @@ class Cms:
 
         return response
 
+    def __delete_req(self, url):
+        try:
+            response = self.__session.delete(
+                url,
+                verify=self.__ssl_is_valid,
+                timeout=5)
+
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
+            print(err)
+            raise
+
+        return response
+
     def get_spaces(self):
         """Get coSpace objects
         """
@@ -543,4 +556,112 @@ class Cms:
     
     def set_xmpp(self, properties=None):
         url = self.__url_api + "system/configuration/xmpp"
+        return self.__post_req(url, properties)
+
+    def add_outbounddialplan(self, properties=None):
+        """CREATE an outbound dial plan rule
+
+        Properties:
+            localContactDomain
+        """
+
+        url = self.__url_api + "outbounddialplanrules"
+        return self.__post_req(url, properties)
+
+    def mod_outbounddialplan(self, rule_id, properties=None):
+        """UPDATE an outbound dial plan rule
+        """
+
+        url = self.__url_api + "outbounddialplanrules/" + rule_id
+        return self.__put_req(url, properties)
+
+    def del_outbounddialplan(self, rule_id):
+        """DELETE an outbound dial plan rule
+        """
+
+        url = self.__url_api + "outbounddialplanrules/" + rule_id
+        return self.__delete_req(url)
+
+    def add_inbounddialplan(self, properties=None):
+        """CREATE an inbound dial plan rule
+        """
+
+        url = self.__url_api + "inbounddialplanrules"
+        return self.__post_req(url, properties)
+
+    def mod_inbounddialplan(self, rule_id, properties=None):
+        """UPDATE an inbound dial plan rule
+        """
+
+        url = self.__url_api + "inbounddialplanrules/" + rule_id
+        return self.__put_req(url, properties)
+
+    def del_inbounddialplan(self, rule_id):
+        """DELETE an inbound dial plan rule
+        """
+
+        url = self.__url_api + "inbounddialplanrules/" + rule_id
+        return self.__delete_req(url)
+
+    def add_forwarddialplan(self, properties=None):
+        """CREATE an forward dial plan rule
+        """
+
+        url = self.__url_api + "forwarddialplanrules"
+        return self.__post_req(url, properties)
+
+    def mod_forwarddialplan(self, rule_id, properties=None):
+        """UPDATE an forward dial plan rule
+        """
+
+        url = self.__url_api + "forwarddialplanrules/" + rule_id
+        return self.__put_req(url, properties)
+
+    def del_forwarddialplan(self, rule_id):
+        """DELETE an forward dial plan rule
+        """
+
+        url = self.__url_api + "forwarddialplanrules/" + rule_id
+        return self.__delete_req(url)
+
+    def get_callbridge(self):
+        """READ callbridges
+        """
+
+        url = self.__url_api + "callbridges"
+        return self.__delete_req(url)
+
+    def add_callbridge(self, properties=None):
+        """CREATE a callbridge
+        """
+
+        url = self.__url_api + "callbridges"
+        return self.__post_req(url, properties)
+
+    def mod_callbridge(self, callbridge_id, properties=None):
+        """UPDATE a callbridge
+        """
+
+        url = self.__url_api + "callbridges/" + callbridge_id
+        return self.__post_req(url, properties)
+
+    def get_callbridgegroup(self):
+        """READ callBridgeGroup
+        """
+
+        url = self.__url_api + "callbridgegroup"
+        return self.__delete_req(url)
+
+    def add_callbridgegroup(self, properties=None):
+        """CREATE a callBridgeGroup
+        """
+
+        url = self.__url_api + "callbridgegroup"
+        return self.__post_req(url, properties)
+
+    def mod_callbridgegroup(self, callbridgegroup_id, properties=None):
+        """UPDATE a callBridgeGroup
+        """
+
+        url = self.__url_api + "callbridgegroup/" + callbridgegroup_id
         return self.__post_req(url, properties)
