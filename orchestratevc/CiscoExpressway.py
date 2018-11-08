@@ -2,6 +2,8 @@ import json
 import requests
 import datetime
 
+from lxml import etree
+
 class CiscoExpressway:
 
     def __init__(self, address, username, password):
@@ -10,6 +12,9 @@ class CiscoExpressway:
         self.__password = str(password)
         self.__session = requests.session()
         self.__session.auth = self.get_username(), self.get_password()
+        self.__url = "https://" + address
+        # Supress requests warnings
+        requests.packages.urllib3.disable_warnings()
     
     def __str__(self):
         return json.dumps({
@@ -47,13 +52,12 @@ class CiscoExpressway:
                 timeout=5)
 
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
-            print(err)
             raise
 
         return response
 
     def __post_req(self, url, properties=None):
-        print("Postreq data: ", properties)
+        #print("Postreq data: ", properties)
         try:
             response = self.__session.post(
                 url,
@@ -63,13 +67,14 @@ class CiscoExpressway:
                 timeout=5)
 
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
-            print(err)
             raise
 
+        #print(response.text)
+        #print(response.json())
         return response
 
     def __put_req(self, url, properties=None):
-        print("Putreq data: ", properties)
+        #print("Putreq data: ", properties)
         try:
             response = self.__session.put(
                 url,
@@ -106,7 +111,7 @@ class CiscoExpressway:
         print(self.get_username(), self.get_password())
         return self.__get_req(url).text
 
-    def mod_dns(self, properties=None):
+    def mod_dns(self, domain_name=None, host_name=None, properties=None):
         """UPDATE DNS configuration
 
         DNSRequestsPortRange
@@ -122,8 +127,13 @@ class CiscoExpressway:
             str: The API response string
         """
 
+        data = {
+            "DomainName": domain_name,
+            "SystemHostName": host_name
+        }
+
         url = "https://" + self.__address + "/api/provisioning/common/dns/dns"
-        return self.__put_req(url, json.dumps(properties)).text
+        return self.__put_req(url, json.dumps(data)).json()
 
     def new_dnsserver(self):
         #TODO : API doesn't appear to work correctly
@@ -140,12 +150,34 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/common/dns/dnsserver"
         self.__get_req(url)
 
-    def new_domain(self, properties=None):
-        """CREATE DNS domain
+    def new_domain(self, domain_name=None, edge_xmpp=None, sip=None, xmpp_federation=None,
+        edge_sip=None):
+        """CREATE domain
+
+        Args:
+            domain_name (str): The domain name
+            edge_xmpp (bool): Edge XMPP on/off
+            sip (bool): Sip on/off
+            xmpp_federation (bool): XMPP federation on/off
+            edge_sip (bool): Edge SIP on/off
         """
 
-        url = "https://" + self.__address + "/api/provisioning/common/dns/domain"
-        self.__post_req(url, properties)
+        data = {
+            "Name": domain_name,
+            "EdgeXmpp": edge_xmpp,
+            "Sip": sip,
+            "XmppFederation": xmpp_federation,
+            "EdgeSip": edge_sip
+        }
+
+        new_dict = dict()
+
+        for k,v in data.items():
+            if (v is not None):
+                new_dict[k] = v
+
+        url = "https://" + self.__address + "/api/provisioning/common/domain"
+        self.__post_req(url, new_dict)
 
     def get_domain(self, properties=None):
         """READ DNS domain
@@ -154,12 +186,21 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/common/dns/domain"
         self.__get_req(url)
 
-    def mod_mra(self, properties=None):
+    def mod_mra(self, enabled="Off", sso="Off"):
         """UPDATE MRA configuration
+
+        Args:
+            enabled (str): Turn MRA Off or On
+            sso (str): Turn SSO Off or On
         """
 
+        data = dict(
+            Enabled = enabled,
+            SSO = sso
+        )
+
         url = "https://" + self.__address + "/api/provisioning/common/mra"
-        self.__put_req(url, properties)
+        return self.__put_req(url, json.dumps(data)).json()
 
     def get_mra(self):
         """READ MRA configuration
@@ -168,12 +209,27 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/common/mra"
         self.__get_req(url)
 
-    def mod_sip(self, properties=None):
+    def mod_sip(self, sip_mode=None, tcp_mode=None, tcp_port=None, properties=None):
         """UPDATE SIP configuration
         """
 
+        data = dict(
+            SipMode = sip_mode,
+            TcpMode = tcp_mode,
+            TcpPort = tcp_port
+        )
+
+        new_dict = dict()
+
+        for k,v in data.items():
+            if (v is not None):
+                new_dict[k] = v
+
+        if properties is not None:
+            new_dict.update(properties)
+
         url = "https://" + self.__address + "/api/provisioning/common/protocol/sip/configuration"
-        self.__put_req(url, json.dumps(properties))
+        return self.__put_req(url, json.dumps(new_dict)).json()
 
     def get_sip(self):
         """READ SIP configuration
@@ -313,12 +369,26 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/common/zone/neighborzone"
         self.__get_req(url)
 
-    def new_neighborzone(self, properties=None):
+    def new_neighborzone(self, zone_name=None, peer_address=None, properties=None):
         """CREATE neighborzone
+
+        Args:
+            zone_name (str): name of the zone
+            peer_address (list): list of peer addresses preferably FQDN's
         """
 
+        if (zone_name is None or peer_address is None):
+            return dict("Error", "Missing name or peerAddress arguments")
+
+        data = {
+            "Name": zone_name,
+            "PeerAddress": peer_address
+        }
+
         url = "https://" + self.__address + "/api/provisioning/common/zone/neighborzone"
-        self.__post_req(url, json.dumps(properties))
+        response = self.__post_req(url, json.dumps(data))
+        
+        return(response.json())
     
     def mod_neighborzone(self, properties=None):
         """UPDATE neighborzone
@@ -341,13 +411,37 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/controller/server/cucm"
         self.__get_req(url)
 
-    def new_cucmserver(self, properties=None):
+    def new_cucmserver(self, publisher=None, axl_username=None, axl_password=None, properties=None):
         """CREATE CUCM server configuration
+
+        Args:
+            publisher: CUCM publisher FQDN
+            axl_username: CUCM AXL service account
+            axl_password: CCUCM AXL service account password
         """
 
-        url = "https://" + self.__address + "/api/provisioning/controller/server/cucm"
-        self.__post_req(url, properties)
+        data = dict(
+            Publisher = publisher,
+            AxlUsername = axl_username,
+            AxlPassword = axl_password
+        )
 
+        new_dict = dict()
+
+        for k,v in data.items():
+            if (v is not None):
+                new_dict[k] = v
+
+        if properties is not None:
+            new_dict.update(properties)
+
+
+        url = "https://" + self.__address + "/api/provisioning/controller/server/cucm"
+        try:
+            return self.__post_req(url, json.dumps(data)).json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
+            return json.dumps({"Error": "Timeout or Connection Error"})
+            
     def del_cucmserver(self, properties=None):
         """DELETE CUCM server configuration
         """
@@ -432,12 +526,44 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/controller/zone/unifiedcommunicationstraversal"
         self.__get_req(url)
 
-    def new_uczone_traversalclient(self, properties=None):
+    def new_uczone_traversalclient(self, zone_name=None, peer_address=None,
+        auth_user=None, auth_pass=None, accept_proxy_reg=False, sip_port=None, **kwargs):
         """CREATE traversalclient zone
+
+        Args:
+            zone_name (str): name of the zone
+            peer_address (list): list of peer addresses preferably FQDN's
+            auth_user (str): zone auth user
+            auth_pass (str): zone auth pass
         """
 
+        if (zone_name is None or peer_address is None):
+            return dict("Error", "Missing name or peerAddress arguments")
+
+        if (accept_proxy_reg):
+            accept_proxy_reg = "Allow"
+        else:
+            accept_proxy_reg = "Deny"
+
+        data = {
+            "Name": zone_name,
+            "PeerAddress": peer_address,
+            "AuthenticationUserName": auth_user,
+            "AuthenticationPassword": auth_pass,
+            "AcceptProxiedRegistrations": accept_proxy_reg,
+            "SIPPort": sip_port
+        }
+
+        data.update(kwargs)
+
         url = "https://" + self.__address + "/api/provisioning/controller/zone/unifiedcommunicationstraversal"
-        self.__post_req(url, json.dumps(properties))
+
+        try:
+            response = self.__post_req(url, json.dumps(data))
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
+            return json.dumps({"Error": "Timeout or Connection Error"})
+
+        return(response.json())
 
     def mod_uczone_traversalclient(self, properties=None):
         """UPDATE traversalclient zone
@@ -473,3 +599,81 @@ class CiscoExpressway:
 
         url = "https://" + self.__address + "/api/provisioning/optionkey"
         self.__delete_req(url, properties)
+
+    def get_statusxml(self):
+        url = "https://" + self.__address + "/status.xml"
+
+        try:
+            return self.__get_req(url)
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
+            return json.dumps({"Error": "Timeout or Connection Error"})
+    
+    def get_serial(self):
+        ns = {'ns': 'http://www.tandberg.no/XML/CUIL/1.0'}
+
+        status_xml = etree.fromstring(self.get_statusxml().text)
+
+        return {"Serial": status_xml.find(
+            "ns:SystemUnit[@item='1']/ns:Hardware[@item='1']/ns:SerialNumber[@item='1']",
+            namespaces=ns).text}
+    
+    def get_license_detail(self):
+        ns = {'ns': 'http://www.tandberg.no/XML/CUIL/1.0'}
+
+        status_xml = etree.fromstring(self.get_statusxml().text)
+
+        current_call_count = 0
+        calls = status_xml.find("ns:Calls[@item='1']", namespaces=ns)
+
+        for call in calls:
+            current_call_count += 1
+        
+        data = dict()
+
+        data['collaboration_edge_in_use'] = status_xml.find(
+            "ns:ResourceUsage[@item='1']/ns:Calls[@item='1']/ns:CollaborationEdge[@item='1']/ns:Current[@item='1']",
+            namespaces=ns).text
+        
+        # No data point for collaboration edge limit.
+        
+        data['traversal_in_use'] = status_xml.find(
+            "ns:ResourceUsage[@item='1']/ns:Calls[@item='1']/ns:Traversal[@item='1']/ns:Current[@item='1']",
+            namespaces=ns).text
+
+        data['traversal_limit'] = status_xml.find(
+            "ns:SystemUnit[@item='1']/ns:Software[@item='1']/ns:Configuration[@item='1']/ns:TraversalCalls[@item='1']",
+            namespaces=ns).text
+
+        data['non_traversal_in_use'] = status_xml.find(
+            "ns:ResourceUsage[@item='1']/ns:Calls[@item='1']/ns:NonTraversal[@item='1']/ns:Current[@item='1']",
+            namespaces=ns).text
+
+        data['non_traversal_limit'] = status_xml.find(
+            "ns:SystemUnit[@item='1']/ns:Software[@item='1']/ns:Configuration[@item='1']"
+            "/ns:NonTraversalCalls[@item='1']",
+            namespaces=ns).text
+
+        data['current_registrations'] = status_xml.find(
+            "ns:ResourceUsage[@item='1']/ns:Registrations[@item='1']/ns:Current[@item='1']", namespaces=ns).text
+
+        data['concurrent_calls'] = current_call_count
+
+        return data
+
+    def get_version(self):
+        ns = {'ns': 'http://www.tandberg.no/XML/CUIL/1.0'}
+
+        status_xml = etree.fromstring(self.get_statusxml().text)
+
+        return {"Version": status_xml.find(
+            "ns:SystemUnit[@item='1']/ns:Software[@item='1']/ns:Version[@item='1']",
+            namespaces=ns).text}
+
+    def get_uptime(self):
+        ns = {'ns': 'http://www.tandberg.no/XML/CUIL/1.0'}
+
+        status_xml = etree.fromstring(self.get_statusxml().text)
+
+        return {"Uptime": status_xml.find(
+            "ns:SystemUnit[@item='1']/ns:Uptime[@item='1']",
+            namespaces=ns).text}
