@@ -57,7 +57,6 @@ class CiscoExpressway:
         return response
 
     def __post_req(self, url, properties=None):
-        #print("Postreq data: ", properties)
         try:
             response = self.__session.post(
                 url,
@@ -69,12 +68,9 @@ class CiscoExpressway:
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
             raise
 
-        #print(response.text)
-        #print(response.json())
         return response
 
     def __put_req(self, url, properties=None):
-        #print("Putreq data: ", properties)
         try:
             response = self.__session.put(
                 url,
