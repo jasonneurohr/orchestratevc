@@ -61,9 +61,9 @@ class CiscoExpressway:
             response = self.__session.post(
                 url,
                 verify=False,
-                data=properties,
+                data=json.dumps(properties),
                 headers={"Content-Type":"application/json"},
-                timeout=5)
+                timeout=10)
 
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
             raise
@@ -75,7 +75,7 @@ class CiscoExpressway:
             response = self.__session.put(
                 url,
                 verify=False,
-                data=properties,
+                data=json.dumps(properties),
                 headers={"Content-Type":"application/json"},
                 timeout=5)
 
@@ -129,7 +129,7 @@ class CiscoExpressway:
         }
 
         url = "https://" + self.__address + "/api/provisioning/common/dns/dns"
-        return self.__put_req(url, json.dumps(data)).json()
+        return self.__put_req(url, data).json()
 
     def new_dnsserver(self):
         #TODO : API doesn't appear to work correctly
@@ -137,7 +137,7 @@ class CiscoExpressway:
         """
         data=None
         url = "https://" + self.__address + "/api/provisioning/common/dns/dnsserver"
-        return self.__post_req(url, json.dumps(data)).text
+        return self.__post_req(url, data).text
 
     def get_dnsserver(self, properties=None):
         """READ DNS server configuration
@@ -196,7 +196,7 @@ class CiscoExpressway:
         )
 
         url = "https://" + self.__address + "/api/provisioning/common/mra"
-        return self.__put_req(url, json.dumps(data)).json()
+        return self.__put_req(url, data).json()
 
     def get_mra(self):
         """READ MRA configuration
@@ -205,7 +205,7 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/common/mra"
         self.__get_req(url)
 
-    def mod_sip(self, sip_mode=None, tcp_mode=None, tcp_port=None, properties=None):
+    def mod_sip(self, sip_mode=None, tcp_mode=None, tcp_port=None, **kwargs):
         """UPDATE SIP configuration
         """
 
@@ -221,11 +221,12 @@ class CiscoExpressway:
             if (v is not None):
                 new_dict[k] = v
 
-        if properties is not None:
-            new_dict.update(properties)
+        if kwargs is not None:
+            new_dict.update(kwargs)
 
         url = "https://" + self.__address + "/api/provisioning/common/protocol/sip/configuration"
-        return self.__put_req(url, json.dumps(new_dict)).json()
+        
+        return self.__put_req(url, new_dict).json()
 
     def get_sip(self):
         """READ SIP configuration
@@ -365,7 +366,7 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/common/zone/neighborzone"
         self.__get_req(url)
 
-    def new_neighborzone(self, zone_name=None, peer_address=None, properties=None):
+    def new_neighborzone(self, zone_name=None, peer_address=None, **kwargs):
         """CREATE neighborzone
 
         Args:
@@ -382,8 +383,7 @@ class CiscoExpressway:
         }
 
         url = "https://" + self.__address + "/api/provisioning/common/zone/neighborzone"
-        response = self.__post_req(url, json.dumps(data))
-        
+        response = self.__post_req(url, data)
         return(response.json())
     
     def mod_neighborzone(self, properties=None):
@@ -434,9 +434,9 @@ class CiscoExpressway:
 
         url = "https://" + self.__address + "/api/provisioning/controller/server/cucm"
         try:
-            return self.__post_req(url, json.dumps(data)).json()
+            return self.__post_req(url, data).json()
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
-            return json.dumps({"Error": "Timeout or Connection Error"})
+            return {"Error": "Timeout or Connection Error"}
             
     def del_cucmserver(self, properties=None):
         """DELETE CUCM server configuration
@@ -457,7 +457,7 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/controller/zone/traversalclient"
-        self.__post_req(url, json.dumps(properties))
+        self.__post_req(url, jproperties)
 
     def mod_zone_traversalclient(self, properties=None):
         """UPDATE traversalclient zone
@@ -499,7 +499,7 @@ class CiscoExpressway:
         """
 
         url = "https://" + self.__address + "/api/provisioning/edge/zone/traversalserver"
-        self.__post_req(url, properties)
+        return self.__post_req(url, properties).json()
 
     def mod_zone_traversalserver(self, properties=None):
         """UPDATE traversalserver zone configuration
@@ -555,11 +555,9 @@ class CiscoExpressway:
         url = "https://" + self.__address + "/api/provisioning/controller/zone/unifiedcommunicationstraversal"
 
         try:
-            response = self.__post_req(url, json.dumps(data))
+            return self.__post_req(url, data).json()
         except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as err:
             return json.dumps({"Error": "Timeout or Connection Error"})
-
-        return(response.json())
 
     def mod_uczone_traversalclient(self, properties=None):
         """UPDATE traversalclient zone
